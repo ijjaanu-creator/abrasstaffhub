@@ -1,0 +1,254 @@
+import { useAuth } from '@/contexts/AuthContext';
+import { mockAttendance, mockPayroll, mockStaff } from '@/data/mockData';
+import { StatsCard } from '@/components/dashboard/StatsCard';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import {
+  Clock,
+  Wallet,
+  Calendar,
+  Fingerprint,
+  CheckCircle2,
+  TrendingUp,
+} from 'lucide-react';
+
+export default function StaffDashboard() {
+  const { user } = useAuth();
+
+  // Get staff data (using first staff member as demo)
+  const staffMember = mockStaff[0];
+  const todayAttendance = mockAttendance.find((a) => a.staffId === staffMember.id);
+  const latestPayroll = mockPayroll.find((p) => p.staffId === staffMember.id);
+
+  const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  return (
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="animate-fade-in">
+        <h1 className="font-display text-3xl font-bold text-foreground">
+          Good morning, {user?.name?.split(' ')[0]}!
+        </h1>
+        <p className="mt-1 text-muted-foreground">
+          {new Date().toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })}
+        </p>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <StatsCard
+          title="Today's Status"
+          value={todayAttendance?.status === 'present' ? 'Present' : todayAttendance?.status || 'Not marked'}
+          icon={CheckCircle2}
+          variant={todayAttendance?.status === 'present' ? 'success' : 'warning'}
+          className="animate-fade-in"
+        />
+        <StatsCard
+          title="Check In"
+          value={todayAttendance?.checkIn || '--:--'}
+          icon={Clock}
+          className="animate-fade-in delay-100"
+        />
+        <StatsCard
+          title="Check Out"
+          value={todayAttendance?.checkOut || '--:--'}
+          icon={Clock}
+          className="animate-fade-in delay-200"
+        />
+        <StatsCard
+          title="Work Hours"
+          value={todayAttendance?.workHours ? `${todayAttendance.workHours.toFixed(1)}h` : '0h'}
+          icon={TrendingUp}
+          variant="primary"
+          className="animate-fade-in delay-300"
+        />
+      </div>
+
+      {/* Main Content */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Mark Attendance Card */}
+        <div className="rounded-xl border border-border bg-card p-6 shadow-elegant animate-fade-in delay-200">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl gradient-primary">
+              <Fingerprint className="h-7 w-7 text-primary-foreground" />
+            </div>
+            <div>
+              <h3 className="font-display text-lg font-semibold text-foreground">
+                Mark Attendance
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Use biometric to mark your attendance
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <Button
+              variant="hero"
+              size="lg"
+              className="w-full"
+              disabled={!!todayAttendance?.checkIn}
+            >
+              <Fingerprint className="h-5 w-5 mr-2" />
+              {todayAttendance?.checkIn ? 'Already Checked In' : 'Check In'}
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full"
+              disabled={!todayAttendance?.checkIn || !!todayAttendance?.checkOut}
+            >
+              <Clock className="h-5 w-5 mr-2" />
+              {todayAttendance?.checkOut ? 'Already Checked Out' : 'Check Out'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Salary Overview */}
+        <div className="rounded-xl border border-border bg-card p-6 shadow-elegant animate-fade-in delay-300">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-success/10">
+                <Wallet className="h-7 w-7 text-success" />
+              </div>
+              <div>
+                <h3 className="font-display text-lg font-semibold text-foreground">
+                  Salary Overview
+                </h3>
+                <p className="text-sm text-muted-foreground">{currentMonth}</p>
+              </div>
+            </div>
+          </div>
+
+          {latestPayroll && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between py-2">
+                <span className="text-muted-foreground">Base Salary</span>
+                <span className="font-medium text-foreground">
+                  AED {latestPayroll.baseSalary.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-muted-foreground">Overtime</span>
+                <span className="font-medium text-success">
+                  +AED {latestPayroll.overtime.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-muted-foreground">Deductions</span>
+                <span className="font-medium text-destructive">
+                  -AED {latestPayroll.deductions.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-muted-foreground">Bonus</span>
+                <span className="font-medium text-success">
+                  +AED {latestPayroll.bonus.toLocaleString()}
+                </span>
+              </div>
+              <div className="border-t border-border pt-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-foreground">Net Salary</span>
+                  <span className="text-2xl font-bold font-display text-primary">
+                    AED {latestPayroll.netSalary.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+              <div
+                className={cn(
+                  'flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium',
+                  latestPayroll.status === 'paid'
+                    ? 'bg-success/10 text-success'
+                    : latestPayroll.status === 'processed'
+                    ? 'bg-info/10 text-info'
+                    : 'bg-warning/10 text-warning'
+                )}
+              >
+                <span className="capitalize">{latestPayroll.status}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Recent Attendance */}
+      <div className="rounded-xl border border-border bg-card p-6 shadow-elegant animate-fade-in delay-400">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+            <Calendar className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-display text-lg font-semibold text-foreground">
+              Recent Attendance
+            </h3>
+            <p className="text-sm text-muted-foreground">Your attendance history</p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Date</th>
+                <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Check In</th>
+                <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Check Out</th>
+                <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Hours</th>
+                <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...Array(5)].map((_, i) => {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const isToday = i === 0;
+                const record = isToday ? todayAttendance : null;
+
+                return (
+                  <tr key={i} className="border-b border-border/50 last:border-0">
+                    <td className="py-3 text-sm text-foreground">
+                      {date.toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </td>
+                    <td className="py-3 text-sm text-foreground">
+                      {record?.checkIn || (i === 0 ? '--:--' : '09:00')}
+                    </td>
+                    <td className="py-3 text-sm text-foreground">
+                      {record?.checkOut || (i === 0 ? '--:--' : '18:00')}
+                    </td>
+                    <td className="py-3 text-sm text-foreground">
+                      {record?.workHours?.toFixed(1) || (i === 0 ? '0' : '9')}h
+                    </td>
+                    <td className="py-3">
+                      <span
+                        className={cn(
+                          'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                          record?.status === 'present' || i !== 0
+                            ? 'bg-success/10 text-success'
+                            : record?.status === 'late'
+                            ? 'bg-warning/10 text-warning'
+                            : record?.status === 'absent'
+                            ? 'bg-destructive/10 text-destructive'
+                            : 'bg-muted text-muted-foreground'
+                        )}
+                      >
+                        {record?.status || (i === 0 ? 'Pending' : 'Present')}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
