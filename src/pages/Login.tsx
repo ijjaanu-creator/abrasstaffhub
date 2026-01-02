@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,9 +11,17 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
@@ -24,8 +32,8 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const success = await login(email, password);
-      if (success) {
+      const { error } = await login(email, password);
+      if (!error) {
         toast({
           title: 'Welcome back!',
           description: 'You have successfully logged in.',
@@ -34,7 +42,7 @@ export default function Login() {
       } else {
         toast({
           title: 'Login failed',
-          description: 'Invalid email or password. Please try again.',
+          description: error,
           variant: 'destructive',
         });
       }
@@ -154,12 +162,13 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="rounded-xl border border-border bg-muted/50 p-4">
-            <p className="text-sm font-medium text-foreground mb-2">Demo Credentials:</p>
-            <div className="space-y-1 text-sm text-muted-foreground">
-              <p><strong>Admin:</strong> admin@abras.com / admin123</p>
-              <p><strong>Staff:</strong> staff@abras.com / staff123</p>
-            </div>
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">
+              Staff member?{' '}
+              <Link to="/signup" className="text-primary font-medium hover:underline">
+                Sign up here
+              </Link>
+            </p>
           </div>
         </div>
       </div>

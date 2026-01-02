@@ -1,62 +1,170 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { User, UserRole } from '@/types';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+
+type AppRole = 'admin' | 'staff';
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
   isAdmin: boolean;
+  isLoading: boolean;
+  userRole: AppRole | null;
+  login: (email: string, password: string) => Promise<{ error: string | null }>;
+  signup: (email: string, password: string, name: string, phone: string) => Promise<{ error: string | null }>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Demo users for testing
-const demoUsers: Record<string, { password: string; user: User }> = {
-  'admin@abras.com': {
-    password: 'admin123',
-    user: {
-      id: '1',
-      email: 'admin@abras.com',
-      name: 'Ahmed Hassan',
-      role: 'admin',
-      avatar: undefined,
-    },
-  },
-  'staff@abras.com': {
-    password: 'staff123',
-    user: {
-      id: '2',
-      email: 'staff@abras.com',
-      name: 'Fatima Ali',
-      role: 'staff',
-      avatar: undefined,
-    },
-  },
-};
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [userRole, setUserRole] = useState<AppRole | null>(null);
 
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
-    const demoUser = demoUsers[email.toLowerCase()];
-    if (demoUser && demoUser.password === password) {
-      setUser(demoUser.user);
-      return true;
+  const fetchUserRole = useCallback(async (userId: string) => {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .single();
+
+    if (!error && data) {
+      setUserRole(data.role as AppRole);
+    } else {
+      setUserRole(null);
     }
-    return false;
   }, []);
 
-  const logout = useCallback(() => {
+  useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          // Defer fetching role to avoid deadlock
+          setTimeout(() => {
+            fetchUserRole(session.user.id);
+          }, 0);
+        } else {
+          setUserRole(null);
+        }
+        
+        setIsLoading(false);
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchUserRole(session.user.id);
+      }
+      
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [fetchUserRole]);
+
+  const login = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    return { error: null };
+  }, []);
+
+  const signup = useCallback(async (
+    email: string, 
+    password: string, 
+    name: string, 
+    phone: string
+  ): Promise<{ error: string | null }> => {
+    // First check if phone number exists in staff_members table
+    const { data: staffMember, error: staffError } = await supabase
+      .from('staff_members')
+      .select('id, user_id')
+      .eq('phone', phone)
+      .single();
+
+    if (staffError || !staffMember) {
+      return { error: 'Your phone number is not registered. Please contact admin to be added as staff.' };
+    }
+
+    if (staffMember.user_id) {
+      return { error: 'This phone number is already linked to an account.' };
+    }
+
+    // Sign up the user
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+        data: {
+          name,
+          phone,
+        },
+      },
+    });
+
+    if (authError) {
+      return { error: authError.message };
+    }
+
+    if (authData.user) {
+      // Link the staff member to the new user
+      const { error: updateError } = await supabase
+        .from('staff_members')
+        .update({ user_id: authData.user.id, email })
+        .eq('id', staffMember.id);
+
+      if (updateError) {
+        console.error('Error linking staff member:', updateError);
+      }
+
+      // Add staff role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert({ user_id: authData.user.id, role: 'staff' });
+
+      if (roleError) {
+        console.error('Error adding staff role:', roleError);
+      }
+    }
+
+    return { error: null };
+  }, []);
+
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     setUser(null);
+    setSession(null);
+    setUserRole(null);
   }, []);
 
   const value: AuthContextType = {
     user,
+    session,
     isAuthenticated: !!user,
+    isAdmin: userRole === 'admin',
+    isLoading,
+    userRole,
     login,
+    signup,
     logout,
-    isAdmin: user?.role === 'admin',
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
