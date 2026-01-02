@@ -6,11 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Fingerprint, Lock, Mail, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
   const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -32,19 +34,44 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const { error } = await login(email, password);
-      if (!error) {
-        toast({
-          title: 'Welcome back!',
-          description: 'You have successfully logged in.',
+      if (isSignUp) {
+        // Admin sign up flow
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+          },
         });
-        navigate('/dashboard');
+
+        if (authError) {
+          toast({
+            title: 'Sign up failed',
+            description: authError.message,
+            variant: 'destructive',
+          });
+        } else if (authData.user) {
+          toast({
+            title: 'Account created!',
+            description: 'You can now sign in with your credentials.',
+          });
+          setIsSignUp(false);
+        }
       } else {
-        toast({
-          title: 'Login failed',
-          description: error,
-          variant: 'destructive',
-        });
+        const { error } = await login(email, password);
+        if (!error) {
+          toast({
+            title: 'Welcome back!',
+            description: 'You have successfully logged in.',
+          });
+          navigate('/dashboard');
+        } else {
+          toast({
+            title: 'Login failed',
+            description: error,
+            variant: 'destructive',
+          });
+        }
       }
     } catch (error) {
       toast({
@@ -111,9 +138,11 @@ export default function Login() {
           </div>
 
           <div className="text-center lg:text-left">
-            <h2 className="font-display text-3xl font-bold text-foreground">Welcome back</h2>
+            <h2 className="font-display text-3xl font-bold text-foreground">
+              {isSignUp ? 'Create Admin Account' : 'Welcome back'}
+            </h2>
             <p className="mt-2 text-muted-foreground">
-              Sign in to access your dashboard
+              {isSignUp ? 'Set up your admin account' : 'Sign in to access your dashboard'}
             </p>
           </div>
 
@@ -154,21 +183,30 @@ export default function Login() {
               {isLoading ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  Signing in...
+                  {isSignUp ? 'Creating account...' : 'Signing in...'}
                 </>
               ) : (
-                'Sign in'
+                isSignUp ? 'Create Account' : 'Sign in'
               )}
             </Button>
           </form>
 
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground">
-              Staff member?{' '}
-              <Link to="/signup" className="text-primary font-medium hover:underline">
-                Sign up here
-              </Link>
-            </p>
+          <div className="text-center space-y-2">
+            <button
+              type="button"
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-sm text-primary font-medium hover:underline"
+            >
+              {isSignUp ? 'Already have an account? Sign in' : 'Need an admin account? Sign up'}
+            </button>
+            {!isSignUp && (
+              <p className="text-sm text-muted-foreground">
+                Staff member?{' '}
+                <Link to="/signup" className="text-primary font-medium hover:underline">
+                  Sign up here
+                </Link>
+              </p>
+            )}
           </div>
         </div>
       </div>
