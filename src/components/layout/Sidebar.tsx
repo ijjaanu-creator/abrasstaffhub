@@ -33,9 +33,10 @@ const staffNavItems = [
 
 export function Sidebar() {
   const location = useLocation();
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, userRole } = useAuth();
 
   const navItems = isAdmin ? adminNavItems : staffNavItems;
+  const displayName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-border bg-card">
@@ -80,8 +81,8 @@ export function Sidebar() {
               <User className="h-5 w-5 text-primary" />
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="truncate text-sm font-medium text-foreground">{user?.name}</p>
-              <p className="truncate text-xs text-muted-foreground capitalize">{user?.role}</p>
+              <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
+              <p className="truncate text-xs text-muted-foreground capitalize">{userRole || 'User'}</p>
             </div>
           </div>
           <Button

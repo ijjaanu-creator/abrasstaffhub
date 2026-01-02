@@ -1,8 +1,10 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { mockAttendance, mockPayroll, mockStaff } from '@/data/mockData';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import {
   Clock,
   Wallet,
@@ -10,15 +12,126 @@ import {
   Fingerprint,
   CheckCircle2,
   TrendingUp,
+  Loader2,
 } from 'lucide-react';
 
 export default function StaffDashboard() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  const displayName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
 
-  // Get staff data (using first staff member as demo)
-  const staffMember = mockStaff[0];
-  const todayAttendance = mockAttendance.find((a) => a.staffId === staffMember.id);
-  const latestPayroll = mockPayroll.find((p) => p.staffId === staffMember.id);
+  // Fetch staff member data
+  const { data: staffMember } = useQuery({
+    queryKey: ['myStaffRecord', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from('staff_members')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  // Fetch today's attendance
+  const { data: todayAttendance } = useQuery({
+    queryKey: ['myTodayAttendance', staffMember?.id],
+    queryFn: async () => {
+      if (!staffMember?.id) return null;
+      const today = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .eq('staff_id', staffMember.id)
+        .eq('date', today)
+        .single();
+      return data;
+    },
+    enabled: !!staffMember?.id,
+  });
+
+  // Fetch latest payroll
+  const { data: latestPayroll } = useQuery({
+    queryKey: ['myLatestPayroll', staffMember?.id],
+    queryFn: async () => {
+      if (!staffMember?.id) return null;
+      const { data } = await supabase
+        .from('payroll_records')
+        .select('*')
+        .eq('staff_id', staffMember.id)
+        .order('year', { ascending: false })
+        .order('month', { ascending: false })
+        .limit(1)
+        .single();
+      return data;
+    },
+    enabled: !!staffMember?.id,
+  });
+
+  // Check in mutation
+  const checkInMutation = useMutation({
+    mutationFn: async () => {
+      if (!staffMember?.id) throw new Error('Staff member not found');
+      const today = new Date().toISOString().split('T')[0];
+      const now = new Date().toTimeString().slice(0, 5);
+      const isLate = now > '09:00';
+      
+      const { error } = await supabase
+        .from('attendance_records')
+        .insert({
+          staff_id: staffMember.id,
+          date: today,
+          check_in: now,
+          status: isLate ? 'late' : 'present',
+        });
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['myTodayAttendance'] });
+      toast({ title: 'Checked in successfully!' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Check-in failed', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Check out mutation
+  const checkOutMutation = useMutation({
+    mutationFn: async () => {
+      if (!todayAttendance?.id) throw new Error('No check-in record found');
+      const now = new Date().toTimeString().slice(0, 5);
+      
+      // Calculate work hours
+      const checkIn = todayAttendance.check_in;
+      const [checkInHours, checkInMinutes] = checkIn.split(':').map(Number);
+      const [checkOutHours, checkOutMinutes] = now.split(':').map(Number);
+      const workHours = (checkOutHours + checkOutMinutes / 60) - (checkInHours + checkInMinutes / 60);
+      const overtime = Math.max(0, workHours - 8);
+      
+      const { error } = await supabase
+        .from('attendance_records')
+        .update({
+          check_out: now,
+          work_hours: workHours,
+          overtime: overtime,
+        })
+        .eq('id', todayAttendance.id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['myTodayAttendance'] });
+      toast({ title: 'Checked out successfully!' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Check-out failed', description: error.message, variant: 'destructive' });
+    },
+  });
 
   const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
@@ -27,7 +140,7 @@ export default function StaffDashboard() {
       {/* Header */}
       <div className="animate-fade-in">
         <h1 className="font-display text-3xl font-bold text-foreground">
-          Good morning, {user?.name?.split(' ')[0]}!
+          Good morning, {displayName.split(' ')[0]}!
         </h1>
         <p className="mt-1 text-muted-foreground">
           {new Date().toLocaleDateString('en-US', {
@@ -50,19 +163,19 @@ export default function StaffDashboard() {
         />
         <StatsCard
           title="Check In"
-          value={todayAttendance?.checkIn || '--:--'}
+          value={todayAttendance?.check_in || '--:--'}
           icon={Clock}
           className="animate-fade-in delay-100"
         />
         <StatsCard
           title="Check Out"
-          value={todayAttendance?.checkOut || '--:--'}
+          value={todayAttendance?.check_out || '--:--'}
           icon={Clock}
           className="animate-fade-in delay-200"
         />
         <StatsCard
           title="Work Hours"
-          value={todayAttendance?.workHours ? `${todayAttendance.workHours.toFixed(1)}h` : '0h'}
+          value={todayAttendance?.work_hours ? `${Number(todayAttendance.work_hours).toFixed(1)}h` : '0h'}
           icon={TrendingUp}
           variant="primary"
           className="animate-fade-in delay-300"
@@ -92,19 +205,29 @@ export default function StaffDashboard() {
               variant="hero"
               size="lg"
               className="w-full"
-              disabled={!!todayAttendance?.checkIn}
+              disabled={!!todayAttendance?.check_in || checkInMutation.isPending}
+              onClick={() => checkInMutation.mutate()}
             >
-              <Fingerprint className="h-5 w-5 mr-2" />
-              {todayAttendance?.checkIn ? 'Already Checked In' : 'Check In'}
+              {checkInMutation.isPending ? (
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+              ) : (
+                <Fingerprint className="h-5 w-5 mr-2" />
+              )}
+              {todayAttendance?.check_in ? 'Already Checked In' : 'Check In'}
             </Button>
             <Button
               variant="outline"
               size="lg"
               className="w-full"
-              disabled={!todayAttendance?.checkIn || !!todayAttendance?.checkOut}
+              disabled={!todayAttendance?.check_in || !!todayAttendance?.check_out || checkOutMutation.isPending}
+              onClick={() => checkOutMutation.mutate()}
             >
-              <Clock className="h-5 w-5 mr-2" />
-              {todayAttendance?.checkOut ? 'Already Checked Out' : 'Check Out'}
+              {checkOutMutation.isPending ? (
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+              ) : (
+                <Clock className="h-5 w-5 mr-2" />
+              )}
+              {todayAttendance?.check_out ? 'Already Checked Out' : 'Check Out'}
             </Button>
           </div>
         </div>
@@ -130,32 +253,32 @@ export default function StaffDashboard() {
               <div className="flex items-center justify-between py-2">
                 <span className="text-muted-foreground">Base Salary</span>
                 <span className="font-medium text-foreground">
-                  AED {latestPayroll.baseSalary.toLocaleString()}
+                  AED {Number(latestPayroll.base_salary).toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center justify-between py-2">
                 <span className="text-muted-foreground">Overtime</span>
                 <span className="font-medium text-success">
-                  +AED {latestPayroll.overtime.toLocaleString()}
+                  +AED {Number(latestPayroll.overtime).toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center justify-between py-2">
                 <span className="text-muted-foreground">Deductions</span>
                 <span className="font-medium text-destructive">
-                  -AED {latestPayroll.deductions.toLocaleString()}
+                  -AED {Number(latestPayroll.deductions).toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center justify-between py-2">
                 <span className="text-muted-foreground">Bonus</span>
                 <span className="font-medium text-success">
-                  +AED {latestPayroll.bonus.toLocaleString()}
+                  +AED {Number(latestPayroll.bonus).toLocaleString()}
                 </span>
               </div>
               <div className="border-t border-border pt-4">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-foreground">Net Salary</span>
                   <span className="text-2xl font-bold font-display text-primary">
-                    AED {latestPayroll.netSalary.toLocaleString()}
+                    AED {Number(latestPayroll.net_salary).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -218,13 +341,13 @@ export default function StaffDashboard() {
                       })}
                     </td>
                     <td className="py-3 text-sm text-foreground">
-                      {record?.checkIn || (i === 0 ? '--:--' : '09:00')}
+                      {record?.check_in || (i === 0 ? '--:--' : '09:00')}
                     </td>
                     <td className="py-3 text-sm text-foreground">
-                      {record?.checkOut || (i === 0 ? '--:--' : '18:00')}
+                      {record?.check_out || (i === 0 ? '--:--' : '18:00')}
                     </td>
                     <td className="py-3 text-sm text-foreground">
-                      {record?.workHours?.toFixed(1) || (i === 0 ? '0' : '9')}h
+                      {record?.work_hours ? Number(record.work_hours).toFixed(1) : (i === 0 ? '0' : '9')}h
                     </td>
                     <td className="py-3">
                       <span
