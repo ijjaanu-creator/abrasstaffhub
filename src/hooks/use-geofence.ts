@@ -9,7 +9,7 @@ const ALLOWED_LOCATIONS = [
   { lat: 10.734861, lng: 76.027500, name: 'Location 2' },
 ];
 
-const MAX_DISTANCE_METERS = 500;
+const MAX_DISTANCE_METERS = 100;
 
 // Haversine formula to calculate distance between two points
 function calculateDistance(
