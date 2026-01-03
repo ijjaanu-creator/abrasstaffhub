@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { exportToCSV, formatPayrollForExport } from '@/lib/exportUtils';
+import { PaySalaryDialog } from '@/components/PaySalaryDialog';
 import {
   Search,
   Download,
@@ -15,6 +16,7 @@ import {
   AlertCircle,
   CreditCard,
   Loader2,
+  Plus,
 } from 'lucide-react';
 
 const statusConfig: Record<string, { icon: any; label: string; className: string }> = {
@@ -25,6 +27,7 @@ const statusConfig: Record<string, { icon: any; label: string; className: string
 
 export default function Payroll() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showPayDialog, setShowPayDialog] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -98,6 +101,16 @@ export default function Payroll() {
           </p>
         </div>
         <div className="flex gap-3">
+          <Button
+            variant="default"
+            size="lg"
+            className="flex-1 sm:flex-none"
+            onClick={() => setShowPayDialog(true)}
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            <span className="hidden sm:inline">Pay Salary</span>
+            <span className="sm:hidden">Pay</span>
+          </Button>
           <Button 
             variant="outline" 
             size="lg" 
@@ -114,31 +127,6 @@ export default function Payroll() {
           >
             <Download className="h-5 w-5 mr-2" />
             Export
-          </Button>
-          <Button 
-            variant="default" 
-            size="lg" 
-            className="flex-1 sm:flex-none"
-            onClick={async () => {
-              const pendingRecords = payrollRecords.filter((p: any) => p.status === 'pending');
-              if (pendingRecords.length === 0) {
-                toast({ title: 'No pending payroll to process', variant: 'destructive' });
-                return;
-              }
-              for (const record of pendingRecords) {
-                await updateStatusMutation.mutateAsync({ id: record.id, status: 'processed' });
-              }
-              toast({ title: `Processed ${pendingRecords.length} payroll records` });
-            }}
-            disabled={updateStatusMutation.isPending}
-          >
-            {updateStatusMutation.isPending ? (
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-            ) : (
-              <CreditCard className="h-5 w-5 mr-2" />
-            )}
-            <span className="hidden sm:inline">Process Payroll</span>
-            <span className="sm:hidden">Process</span>
           </Button>
         </div>
       </div>
@@ -402,6 +390,9 @@ export default function Payroll() {
           <p className="text-muted-foreground">No payroll records found.</p>
         </div>
       )}
+
+      {/* Pay Salary Dialog */}
+      <PaySalaryDialog open={showPayDialog} onOpenChange={setShowPayDialog} />
     </div>
   );
 }
