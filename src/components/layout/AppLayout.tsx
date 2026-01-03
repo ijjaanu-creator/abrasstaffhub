@@ -44,7 +44,7 @@ export function AppLayout() {
 
       {/* Main Content */}
       <main className="lg:pl-64">
-        <div className="p-4 lg:p-8">
+        <div className="p-4 pb-20 lg:p-8 lg:pb-20">
           <Outlet />
         </div>
       </main>
