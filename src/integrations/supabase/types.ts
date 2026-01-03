@@ -249,6 +249,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      link_staff_to_user: {
+        Args: { _email: string; _staff_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "staff"
