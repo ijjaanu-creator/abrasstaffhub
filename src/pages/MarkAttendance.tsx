@@ -5,8 +5,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFaceAuth } from '@/hooks/use-face-auth';
+import { useGeofence } from '@/hooks/use-geofence';
 import { FaceCapture } from '@/components/FaceCapture';
-import { Camera, CheckCircle, Loader2, ScanFace } from 'lucide-react';
+import { Camera, CheckCircle, Loader2, ScanFace, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function MarkAttendance() {
@@ -14,6 +15,7 @@ export default function MarkAttendance() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { enrollFace, verifyFace, isEnrolling, isVerifying } = useFaceAuth();
+  const { checkLocation, isChecking: isCheckingLocation } = useGeofence();
   const today = format(new Date(), 'yyyy-MM-dd');
 
   const [showFaceCapture, setShowFaceCapture] = useState(false);
@@ -86,8 +88,8 @@ export default function MarkAttendance() {
     }
   };
 
-  // Handle face check-in
-  const handleCheckIn = () => {
+  // Handle face check-in with geofence
+  const handleCheckIn = async () => {
     if (!staffMember?.face_image_url) {
       toast({
         title: 'Face not enrolled',
@@ -96,12 +98,17 @@ export default function MarkAttendance() {
       });
       return;
     }
+    
+    // Check geofence first
+    const isWithin = await checkLocation();
+    if (!isWithin) return;
+    
     setFaceCaptureMode('verify-in');
     setShowFaceCapture(true);
   };
 
-  // Handle face check-out
-  const handleCheckOut = () => {
+  // Handle face check-out with geofence
+  const handleCheckOut = async () => {
     if (!staffMember?.face_image_url) {
       toast({
         title: 'Face not enrolled',
@@ -110,6 +117,11 @@ export default function MarkAttendance() {
       });
       return;
     }
+    
+    // Check geofence first
+    const isWithin = await checkLocation();
+    if (!isWithin) return;
+    
     setFaceCaptureMode('verify-out');
     setShowFaceCapture(true);
   };
@@ -196,9 +208,8 @@ export default function MarkAttendance() {
           </div>
         ) : !todayAttendance ? (
           <div className="space-y-3">
-            <Button size="lg" className="w-full" onClick={handleCheckIn} disabled={checkInMutation.isPending || isVerifying}>
-              {checkInMutation.isPending || isVerifying ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <ScanFace className="h-5 w-5 mr-2" />}
-              Verify & Check In
+            <Button size="lg" className="w-full" onClick={handleCheckIn} disabled={checkInMutation.isPending || isVerifying || isCheckingLocation}>
+              {checkInMutation.isPending || isVerifying ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : isCheckingLocation ? <><MapPin className="h-5 w-5 mr-2 animate-pulse" /> Checking Location...</> : <><ScanFace className="h-5 w-5 mr-2" /> Verify & Check In</>}
             </Button>
             <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={handleEnrollClick} disabled={isEnrolling}>
               {isEnrolling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ScanFace className="h-4 w-4 mr-2" />}
@@ -210,9 +221,8 @@ export default function MarkAttendance() {
             <div className="text-success flex items-center justify-center gap-2">
               <CheckCircle className="h-5 w-5" /> Checked in at {todayAttendance.check_in}
             </div>
-            <Button size="lg" variant="outline" className="w-full" onClick={handleCheckOut} disabled={checkOutMutation.isPending || isVerifying}>
-              {checkOutMutation.isPending || isVerifying ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Camera className="h-5 w-5 mr-2" />}
-              Verify & Check Out
+            <Button size="lg" variant="outline" className="w-full" onClick={handleCheckOut} disabled={checkOutMutation.isPending || isVerifying || isCheckingLocation}>
+              {checkOutMutation.isPending || isVerifying ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : isCheckingLocation ? <><MapPin className="h-5 w-5 mr-2 animate-pulse" /> Checking Location...</> : <><Camera className="h-5 w-5 mr-2" /> Verify & Check Out</>}
             </Button>
             <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={handleEnrollClick} disabled={isEnrolling}>
               {isEnrolling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ScanFace className="h-4 w-4 mr-2" />}
@@ -231,7 +241,8 @@ export default function MarkAttendance() {
           </div>
         )}
         <p className="text-xs text-center text-muted-foreground mt-4">
-          Use your registered face to verify identity
+          <MapPin className="inline h-3 w-3 mr-1" />
+          Must be within 500m of office to mark attendance
         </p>
       </div>
 
