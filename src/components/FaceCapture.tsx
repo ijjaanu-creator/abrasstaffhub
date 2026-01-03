@@ -17,6 +17,8 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const isEmbedded = window.top !== window.self;
   const { toast } = useToast();
 
   const stopCamera = useCallback(() => {
@@ -35,11 +37,27 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
       if (!stream || !videoRef.current) return;
 
       try {
+        setCameraError(null);
         videoRef.current.srcObject = stream;
+
+        // Wait for data so we don't end up with a "black" element even though play() resolved.
+        const videoEl = videoRef.current;
+        await new Promise<void>((resolve) => {
+          const onReady = () => {
+            videoEl.removeEventListener('loadeddata', onReady);
+            resolve();
+          };
+          videoEl.addEventListener('loadeddata', onReady);
+        });
+
         await videoRef.current.play();
         if (!cancelled) setCameraReady(true);
-      } catch (err) {
-        console.error('[FaceCapture] video.play error:', err);
+      } catch (err: any) {
+        console.error('[FaceCapture] video attach/play error:', err);
+        if (!cancelled) {
+          setCameraReady(false);
+          setCameraError(err?.message || 'Unable to start camera preview.');
+        }
       }
     };
 
@@ -61,12 +79,15 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
     console.log('[FaceCapture] startCamera clicked');
     setIsStarting(true);
     setCameraReady(false);
+    setCameraError(null);
 
     try {
       if (!window.isSecureContext) {
+        const msg = 'Camera requires HTTPS (or localhost).';
+        setCameraError(msg);
         toast({
-          title: 'Camera unavailable in insecure context',
-          description: 'Open this app over HTTPS or localhost to use the camera.',
+          title: 'Camera unavailable',
+          description: msg,
           variant: 'destructive',
         });
         return;
@@ -74,19 +95,21 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
 
       const getUserMedia = navigator.mediaDevices?.getUserMedia;
       if (!getUserMedia) {
+        const msg = 'Your browser does not support camera access.';
+        setCameraError(msg);
         toast({
           title: 'Camera not supported',
-          description: 'Your browser does not support camera access.',
+          description: msg,
           variant: 'destructive',
         });
         return;
       }
 
       // Some environments block camera inside embedded iframes
-      if (window.top !== window.self) {
+      if (isEmbedded) {
         toast({
           title: 'Camera may be blocked in preview',
-          description: 'If this is the embedded preview, open the app in a new tab to allow camera access.',
+          description: 'Open the app in a new tab to allow camera access.',
         });
       }
 
@@ -105,6 +128,8 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
       const name = error?.name || 'CameraError';
       const message = error?.message || 'Unable to access camera.';
 
+      setCameraError(`${name}: ${message}`);
+
       toast({
         title: `Camera error: ${name}`,
         description:
@@ -118,7 +143,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
     } finally {
       setIsStarting(false);
     }
-  }, [toast]);
+  }, [toast, isEmbedded]);
 
   const capturePhoto = useCallback(() => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -144,6 +169,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
   const retake = useCallback(() => {
     setCapturedImage(null);
     setCameraReady(false);
+    setCameraError(null);
     startCamera();
   }, [startCamera]);
 
@@ -207,15 +233,31 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
                   <div>
                     <p className="font-medium text-foreground">Camera not started</p>
                     <p className="text-sm text-muted-foreground mt-1">Position your face within the oval guide</p>
-                  </div>
-                  <Button onClick={startCamera} disabled={isStarting}>
-                    {isStarting ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Camera className="h-4 w-4 mr-2" />
+                    {cameraError && (
+                      <p className="text-xs text-muted-foreground mt-2 break-words">
+                        {cameraError}
+                      </p>
                     )}
-                    Start Camera
-                  </Button>
+                  </div>
+                  <div className="w-full flex flex-col gap-2">
+                    <Button onClick={startCamera} disabled={isStarting}>
+                      {isStarting ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Camera className="h-4 w-4 mr-2" />
+                      )}
+                      Start Camera
+                    </Button>
+                    {isEmbedded && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => window.open(window.location.href, '_blank', 'noopener,noreferrer')}
+                      >
+                        Open in new tab
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -223,6 +265,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
                 <div className="w-full h-full flex flex-col items-center justify-center gap-4">
                   <Loader2 className="h-10 w-10 animate-spin text-primary" />
                   <p className="text-sm text-muted-foreground">Initializing camera...</p>
+                  {cameraError && <p className="text-xs text-muted-foreground break-words max-w-xs text-center">{cameraError}</p>}
                 </div>
               )}
             </>
