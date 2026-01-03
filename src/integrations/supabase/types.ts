@@ -79,6 +79,54 @@ export type Database = {
         }
         Relationships: []
       }
+      executive_locations: {
+        Row: {
+          accuracy: number | null
+          attendance_id: string | null
+          created_at: string
+          id: string
+          latitude: number
+          longitude: number
+          recorded_at: string
+          staff_id: string
+        }
+        Insert: {
+          accuracy?: number | null
+          attendance_id?: string | null
+          created_at?: string
+          id?: string
+          latitude: number
+          longitude: number
+          recorded_at?: string
+          staff_id: string
+        }
+        Update: {
+          accuracy?: number | null
+          attendance_id?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          recorded_at?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "executive_locations_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "executive_locations_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       face_reregistration_requests: {
         Row: {
           created_at: string

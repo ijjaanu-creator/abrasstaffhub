@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFaceAuth } from '@/hooks/use-face-auth';
 import { useGeofence } from '@/hooks/use-geofence';
+import { useLocationTracking } from '@/hooks/use-location-tracking';
 import { FaceCapture } from '@/components/FaceCapture';
 import { Camera, CheckCircle, Loader2, ScanFace, MapPin, Clock, Send } from 'lucide-react';
 import { format } from 'date-fns';
@@ -25,6 +26,7 @@ export default function MarkAttendance() {
   const queryClient = useQueryClient();
   const { enrollFace, verifyFace, isEnrolling, isVerifying } = useFaceAuth();
   const { checkLocation, isChecking: isCheckingLocation, maxDistance } = useGeofence();
+  const { startTracking, stopTracking, isTracking } = useLocationTracking();
   const today = format(new Date(), 'yyyy-MM-dd');
 
   const [showFaceCapture, setShowFaceCapture] = useState(false);
@@ -237,17 +239,26 @@ export default function MarkAttendance() {
       const checkInTime = format(now, 'HH:mm');
       const isLate = now.getHours() >= 9;
       
-      const { error } = await supabase.from('attendance_records').insert({
+      const { data, error } = await supabase.from('attendance_records').insert({
         staff_id: staffMember?.id,
         date: today,
         check_in: checkInTime,
         status: isLate ? 'late' : 'present',
-      });
+      }).select().single();
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['my-attendance-today'] });
       toast({ title: 'Checked in successfully!' });
+      
+      // Start location tracking for Executive staff
+      if (staffMember?.department === 'Executive' && data?.id) {
+        startTracking({
+          staffId: staffMember.id,
+          attendanceId: data.id,
+        });
+      }
     },
   });
 
@@ -263,8 +274,28 @@ export default function MarkAttendance() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-attendance-today'] });
       toast({ title: 'Checked out successfully!' });
+      
+      // Stop location tracking for Executive staff
+      if (staffMember?.department === 'Executive') {
+        stopTracking();
+      }
     },
   });
+
+  // Resume tracking if Executive staff is already checked in (page refresh)
+  useEffect(() => {
+    if (
+      staffMember?.department === 'Executive' &&
+      todayAttendance?.check_in &&
+      !todayAttendance?.check_out &&
+      !isTracking
+    ) {
+      startTracking({
+        staffId: staffMember.id,
+        attendanceId: todayAttendance.id,
+      });
+    }
+  }, [staffMember, todayAttendance, isTracking, startTracking]);
 
   if (staffLoading || isLoading) {
     return <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;

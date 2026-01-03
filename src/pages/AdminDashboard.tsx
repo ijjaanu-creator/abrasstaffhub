@@ -3,6 +3,7 @@ import { StatsCard } from '@/components/dashboard/StatsCard';
 import { AttendanceOverview } from '@/components/dashboard/AttendanceOverview';
 import { PayrollSummary } from '@/components/dashboard/PayrollSummary';
 import { FaceReregistrationRequests } from '@/components/dashboard/FaceReregistrationRequests';
+import { ExecutiveLocations } from '@/components/dashboard/ExecutiveLocations';
 import { Users, UserCheck, UserX, Clock, Wallet, IndianRupee } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -105,6 +106,11 @@ export default function AdminDashboard() {
       {/* Face Re-registration Requests */}
       <div className="animate-fade-in delay-100">
         <FaceReregistrationRequests />
+      </div>
+
+      {/* Executive Live Locations */}
+      <div className="animate-fade-in delay-150">
+        <ExecutiveLocations />
       </div>
 
       {/* Main Content */}
