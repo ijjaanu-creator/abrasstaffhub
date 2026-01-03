@@ -86,11 +86,11 @@ export default function MySalary() {
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-xl border bg-card p-4">
           <p className="text-sm text-muted-foreground">Base Salary</p>
-          <p className="text-2xl font-bold">AED {staffMember.salary.toLocaleString()}</p>
+          <p className="text-2xl font-bold">₹{staffMember.salary.toLocaleString()}</p>
         </div>
         <div className="rounded-xl border bg-card p-4">
           <p className="text-sm text-muted-foreground">Total Paid ({selectedYear})</p>
-          <p className="text-2xl font-bold text-success">AED {totalPaid.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-success">₹{totalPaid.toLocaleString()}</p>
         </div>
       </div>
 
@@ -110,14 +110,14 @@ export default function MySalary() {
                 <div>
                   <p className="font-medium">{record.month} {record.year}</p>
                   <p className="text-sm text-muted-foreground">
-                    Base: AED {record.base_salary.toLocaleString()}
+                    Base: ₹{record.base_salary.toLocaleString()}
                     {record.bonus ? ` + Bonus: ${record.bonus}` : ''}
                     {record.deductions ? ` - Ded: ${record.deductions}` : ''}
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="font-bold">AED {record.net_salary.toLocaleString()}</p>
+                <p className="font-bold">₹{record.net_salary.toLocaleString()}</p>
                 <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', getStatusColor(record.status))}>
                   {record.status}
                 </span>

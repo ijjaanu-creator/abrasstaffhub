@@ -254,7 +254,7 @@ export default function Staff() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="salary">Monthly Salary (AED) *</Label>
+        <Label htmlFor="salary">Monthly Salary (₹) *</Label>
         <Input
           id="salary"
           type="number"
@@ -429,7 +429,7 @@ export default function Staff() {
                   <span>Monthly Salary</span>
                 </div>
                 <span className="font-semibold text-foreground">
-                  AED {staff.salary.toLocaleString()}
+                  ₹{staff.salary.toLocaleString()}
                 </span>
               </div>
             </div>
