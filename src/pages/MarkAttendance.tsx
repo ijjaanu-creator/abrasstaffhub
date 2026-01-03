@@ -7,19 +7,30 @@ import { useToast } from '@/hooks/use-toast';
 import { useFaceAuth } from '@/hooks/use-face-auth';
 import { useGeofence } from '@/hooks/use-geofence';
 import { FaceCapture } from '@/components/FaceCapture';
-import { Camera, CheckCircle, Loader2, ScanFace, MapPin } from 'lucide-react';
+import { Camera, CheckCircle, Loader2, ScanFace, MapPin, Clock, Send } from 'lucide-react';
 import { format } from 'date-fns';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function MarkAttendance() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { enrollFace, verifyFace, isEnrolling, isVerifying } = useFaceAuth();
-  const { checkLocation, isChecking: isCheckingLocation } = useGeofence();
+  const { checkLocation, isChecking: isCheckingLocation, maxDistance } = useGeofence();
   const today = format(new Date(), 'yyyy-MM-dd');
 
   const [showFaceCapture, setShowFaceCapture] = useState(false);
   const [faceCaptureMode, setFaceCaptureMode] = useState<'enroll' | 'verify-in' | 'verify-out'>('enroll');
+  const [showReregisterDialog, setShowReregisterDialog] = useState(false);
+  const [reregisterReason, setReregisterReason] = useState('');
 
   const { data: staffMember, isLoading: staffLoading } = useQuery({
     queryKey: ['my-staff-record', user?.id],
@@ -48,6 +59,78 @@ export default function MarkAttendance() {
     enabled: !!staffMember?.id,
   });
 
+  // Check if there's an approved re-registration request
+  const { data: approvedRequest } = useQuery({
+    queryKey: ['approved-reregistration', staffMember?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('face_reregistration_requests')
+        .select('*')
+        .eq('staff_id', staffMember?.id)
+        .eq('status', 'approved')
+        .order('reviewed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!staffMember?.id && !!staffMember?.face_image_url,
+  });
+
+  // Check if there's a pending request
+  const { data: pendingRequest } = useQuery({
+    queryKey: ['pending-reregistration', staffMember?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('face_reregistration_requests')
+        .select('*')
+        .eq('staff_id', staffMember?.id)
+        .eq('status', 'pending')
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!staffMember?.id && !!staffMember?.face_image_url,
+  });
+
+  // Request re-registration mutation
+  const requestReregisterMutation = useMutation({
+    mutationFn: async (reason: string) => {
+      const { error } = await supabase
+        .from('face_reregistration_requests')
+        .insert({
+          staff_id: staffMember?.id,
+          reason: reason || null,
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-reregistration'] });
+      setShowReregisterDialog(false);
+      setReregisterReason('');
+      toast({
+        title: 'Request submitted',
+        description: 'Your face re-registration request has been sent to admin for approval.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to submit request. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Delete approved request after using it
+  const deleteApprovedRequestMutation = useMutation({
+    mutationFn: async (requestId: string) => {
+      const { error } = await supabase
+        .from('face_reregistration_requests')
+        .delete()
+        .eq('id', requestId);
+      if (error) throw error;
+    },
+  });
+
   // Handle face enrollment click
   const handleEnrollClick = () => {
     if (!staffMember) {
@@ -62,12 +145,34 @@ export default function MarkAttendance() {
     setShowFaceCapture(true);
   };
 
+  // Handle re-register click (requires approval if already enrolled)
+  const handleReregisterClick = () => {
+    if (approvedRequest) {
+      // Has approval, proceed with re-enrollment
+      setFaceCaptureMode('enroll');
+      setShowFaceCapture(true);
+    } else if (pendingRequest) {
+      toast({
+        title: 'Request pending',
+        description: 'Your re-registration request is awaiting admin approval.',
+      });
+    } else {
+      // Show dialog to request approval
+      setShowReregisterDialog(true);
+    }
+  };
+
   // Handle face capture complete
   const handleFaceCaptured = async (imageBase64: string) => {
     if (faceCaptureMode === 'enroll') {
       if (!user?.id || !staffMember?.id) return;
       const success = await enrollFace(user.id, staffMember.id, imageBase64);
       if (success) {
+        // If this was a re-registration with approval, delete the approval
+        if (approvedRequest) {
+          await deleteApprovedRequestMutation.mutateAsync(approvedRequest.id);
+          queryClient.invalidateQueries({ queryKey: ['approved-reregistration'] });
+        }
         queryClient.invalidateQueries({ queryKey: ['my-staff-record'] });
         setShowFaceCapture(false);
       }
@@ -174,6 +279,9 @@ export default function MarkAttendance() {
     );
   }
 
+  const hasApprovedReregister = !!approvedRequest;
+  const hasPendingRequest = !!pendingRequest;
+
   return (
     <div className="max-w-md mx-auto space-y-6">
       <div className="text-center">
@@ -211,9 +319,20 @@ export default function MarkAttendance() {
             <Button size="lg" className="w-full" onClick={handleCheckIn} disabled={checkInMutation.isPending || isVerifying || isCheckingLocation}>
               {checkInMutation.isPending || isVerifying ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : isCheckingLocation ? <><MapPin className="h-5 w-5 mr-2 animate-pulse" /> Checking Location...</> : <><ScanFace className="h-5 w-5 mr-2" /> Verify & Check In</>}
             </Button>
-            <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={handleEnrollClick} disabled={isEnrolling}>
-              {isEnrolling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ScanFace className="h-4 w-4 mr-2" />}
-              Re-register Face
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full text-muted-foreground" 
+              onClick={handleReregisterClick} 
+              disabled={isEnrolling}
+            >
+              {hasPendingRequest ? (
+                <><Clock className="h-4 w-4 mr-2" /> Request Pending</>
+              ) : hasApprovedReregister ? (
+                <><ScanFace className="h-4 w-4 mr-2" /> Re-register Face (Approved)</>
+              ) : (
+                <><ScanFace className="h-4 w-4 mr-2" /> Request Face Re-registration</>
+              )}
             </Button>
           </div>
         ) : !todayAttendance.check_out ? (
@@ -224,9 +343,20 @@ export default function MarkAttendance() {
             <Button size="lg" variant="outline" className="w-full" onClick={handleCheckOut} disabled={checkOutMutation.isPending || isVerifying || isCheckingLocation}>
               {checkOutMutation.isPending || isVerifying ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : isCheckingLocation ? <><MapPin className="h-5 w-5 mr-2 animate-pulse" /> Checking Location...</> : <><Camera className="h-5 w-5 mr-2" /> Verify & Check Out</>}
             </Button>
-            <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={handleEnrollClick} disabled={isEnrolling}>
-              {isEnrolling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ScanFace className="h-4 w-4 mr-2" />}
-              Re-register Face
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full text-muted-foreground" 
+              onClick={handleReregisterClick} 
+              disabled={isEnrolling}
+            >
+              {hasPendingRequest ? (
+                <><Clock className="h-4 w-4 mr-2" /> Request Pending</>
+              ) : hasApprovedReregister ? (
+                <><ScanFace className="h-4 w-4 mr-2" /> Re-register Face (Approved)</>
+              ) : (
+                <><ScanFace className="h-4 w-4 mr-2" /> Request Face Re-registration</>
+              )}
             </Button>
           </div>
         ) : (
@@ -234,15 +364,26 @@ export default function MarkAttendance() {
             <CheckCircle className="h-12 w-12 mx-auto" />
             <p className="font-medium">Attendance Completed</p>
             <p className="text-sm text-muted-foreground">In: {todayAttendance.check_in} | Out: {todayAttendance.check_out}</p>
-            <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={handleEnrollClick} disabled={isEnrolling}>
-              {isEnrolling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ScanFace className="h-4 w-4 mr-2" />}
-              Re-register Face
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full text-muted-foreground" 
+              onClick={handleReregisterClick} 
+              disabled={isEnrolling}
+            >
+              {hasPendingRequest ? (
+                <><Clock className="h-4 w-4 mr-2" /> Request Pending</>
+              ) : hasApprovedReregister ? (
+                <><ScanFace className="h-4 w-4 mr-2" /> Re-register Face (Approved)</>
+              ) : (
+                <><ScanFace className="h-4 w-4 mr-2" /> Request Face Re-registration</>
+              )}
             </Button>
           </div>
         )}
         <p className="text-xs text-center text-muted-foreground mt-4">
           <MapPin className="inline h-3 w-3 mr-1" />
-          Must be within 500m of office to mark attendance
+          Must be within {maxDistance}m of office to mark attendance
         </p>
       </div>
 
@@ -255,6 +396,42 @@ export default function MarkAttendance() {
           isProcessing={isEnrolling || isVerifying}
         />
       )}
+
+      {/* Re-registration Request Dialog */}
+      <Dialog open={showReregisterDialog} onOpenChange={setShowReregisterDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request Face Re-registration</DialogTitle>
+            <DialogDescription>
+              Your request will be sent to an admin for approval. Once approved, you can re-register your face.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Textarea
+              placeholder="Reason for re-registration (optional)"
+              value={reregisterReason}
+              onChange={(e) => setReregisterReason(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReregisterDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => requestReregisterMutation.mutate(reregisterReason)}
+              disabled={requestReregisterMutation.isPending}
+            >
+              {requestReregisterMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              Submit Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
