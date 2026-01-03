@@ -195,12 +195,18 @@ export default function MarkAttendance() {
             </Button>
           </div>
         ) : !todayAttendance ? (
-          <Button size="lg" className="w-full" onClick={handleCheckIn} disabled={checkInMutation.isPending || isVerifying}>
-            {checkInMutation.isPending || isVerifying ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <ScanFace className="h-5 w-5 mr-2" />}
-            Verify & Check In
-          </Button>
+          <div className="space-y-3">
+            <Button size="lg" className="w-full" onClick={handleCheckIn} disabled={checkInMutation.isPending || isVerifying}>
+              {checkInMutation.isPending || isVerifying ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <ScanFace className="h-5 w-5 mr-2" />}
+              Verify & Check In
+            </Button>
+            <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={handleEnrollClick} disabled={isEnrolling}>
+              {isEnrolling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ScanFace className="h-4 w-4 mr-2" />}
+              Re-register Face
+            </Button>
+          </div>
         ) : !todayAttendance.check_out ? (
-          <>
+          <div className="space-y-3">
             <div className="text-success flex items-center justify-center gap-2">
               <CheckCircle className="h-5 w-5" /> Checked in at {todayAttendance.check_in}
             </div>
@@ -208,12 +214,20 @@ export default function MarkAttendance() {
               {checkOutMutation.isPending || isVerifying ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Camera className="h-5 w-5 mr-2" />}
               Verify & Check Out
             </Button>
-          </>
+            <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={handleEnrollClick} disabled={isEnrolling}>
+              {isEnrolling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ScanFace className="h-4 w-4 mr-2" />}
+              Re-register Face
+            </Button>
+          </div>
         ) : (
-          <div className="space-y-2 text-success">
+          <div className="space-y-4 text-success">
             <CheckCircle className="h-12 w-12 mx-auto" />
             <p className="font-medium">Attendance Completed</p>
             <p className="text-sm text-muted-foreground">In: {todayAttendance.check_in} | Out: {todayAttendance.check_out}</p>
+            <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={handleEnrollClick} disabled={isEnrolling}>
+              {isEnrolling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ScanFace className="h-4 w-4 mr-2" />}
+              Re-register Face
+            </Button>
           </div>
         )}
         <p className="text-xs text-center text-muted-foreground mt-4">

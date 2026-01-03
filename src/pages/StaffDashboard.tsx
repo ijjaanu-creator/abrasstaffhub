@@ -358,6 +358,20 @@ export default function StaffDashboard() {
                 )}
                 {todayAttendance?.check_out ? 'Already Checked Out' : 'Verify & Check Out'}
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-muted-foreground"
+                disabled={isEnrolling}
+                onClick={handleEnrollClick}
+              >
+                {isEnrolling ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <ScanFace className="h-4 w-4 mr-2" />
+                )}
+                Re-register Face
+              </Button>
               <p className="text-xs text-center text-muted-foreground mt-2">
                 Use your registered face to verify identity
               </p>
