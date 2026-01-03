@@ -223,7 +223,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
                 autoPlay
                 playsInline
                 muted
-                className={`w-full h-full object-cover absolute inset-0 ${stream && cameraReady ? 'opacity-100' : 'opacity-0'}`}
+                className={`w-full h-full object-cover absolute inset-0 ${stream && cameraReady ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
                 style={{ transform: 'scaleX(-1)' }}
               />
 
