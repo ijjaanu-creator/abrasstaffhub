@@ -1,1 +1,4 @@
 project_id = "yueajtfynoszalboqunl"
+
+[functions.verify-face]
+verify_jwt = true

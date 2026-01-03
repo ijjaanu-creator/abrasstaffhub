@@ -1,18 +1,23 @@
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useBiometricAuth } from '@/hooks/use-biometric-auth';
-import { Fingerprint, Clock, CheckCircle, Loader2, ScanFace } from 'lucide-react';
+import { useFaceAuth } from '@/hooks/use-face-auth';
+import { FaceCapture } from '@/components/FaceCapture';
+import { Camera, CheckCircle, Loader2, ScanFace } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function MarkAttendance() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { verify, isAuthenticating, enroll, isEnrolling } = useBiometricAuth();
+  const { enrollFace, verifyFace, isEnrolling, isVerifying } = useFaceAuth();
   const today = format(new Date(), 'yyyy-MM-dd');
+
+  const [showFaceCapture, setShowFaceCapture] = useState(false);
+  const [faceCaptureMode, setFaceCaptureMode] = useState<'enroll' | 'verify-in' | 'verify-out'>('enroll');
 
   const { data: staffMember, isLoading: staffLoading } = useQuery({
     queryKey: ['my-staff-record', user?.id],
@@ -41,43 +46,72 @@ export default function MarkAttendance() {
     enabled: !!staffMember?.id,
   });
 
-  // Handle biometric enrollment
-  const handleEnroll = async () => {
-    if (!staffMember) return;
-    await enroll(staffMember.id, staffMember.name);
-    queryClient.invalidateQueries({ queryKey: ['my-staff-record'] });
-  };
-
-  // Handle biometric check-in
-  const handleCheckIn = async () => {
-    if (!staffMember?.biometric_credential_id) {
+  // Handle face enrollment click
+  const handleEnrollClick = () => {
+    if (!staffMember) {
       toast({
-        title: 'Biometric not enrolled',
-        description: 'Please enroll your fingerprint or face first.',
+        title: 'Staff record not found',
+        description: 'Your account is not linked to a staff record.',
         variant: 'destructive',
       });
       return;
     }
-    const verified = await verify(staffMember.biometric_credential_id);
-    if (verified) {
-      checkInMutation.mutate();
+    setFaceCaptureMode('enroll');
+    setShowFaceCapture(true);
+  };
+
+  // Handle face capture complete
+  const handleFaceCaptured = async (imageBase64: string) => {
+    if (faceCaptureMode === 'enroll') {
+      if (!user?.id || !staffMember?.id) return;
+      const success = await enrollFace(user.id, staffMember.id, imageBase64);
+      if (success) {
+        queryClient.invalidateQueries({ queryKey: ['my-staff-record'] });
+        setShowFaceCapture(false);
+      }
+    } else if (faceCaptureMode === 'verify-in') {
+      if (!staffMember?.face_image_url) return;
+      const verified = await verifyFace(staffMember.face_image_url, imageBase64);
+      if (verified) {
+        setShowFaceCapture(false);
+        checkInMutation.mutate();
+      }
+    } else if (faceCaptureMode === 'verify-out') {
+      if (!staffMember?.face_image_url) return;
+      const verified = await verifyFace(staffMember.face_image_url, imageBase64);
+      if (verified) {
+        setShowFaceCapture(false);
+        checkOutMutation.mutate();
+      }
     }
   };
 
-  // Handle biometric check-out
-  const handleCheckOut = async () => {
-    if (!staffMember?.biometric_credential_id) {
+  // Handle face check-in
+  const handleCheckIn = () => {
+    if (!staffMember?.face_image_url) {
       toast({
-        title: 'Biometric not enrolled',
-        description: 'Please enroll your fingerprint or face first.',
+        title: 'Face not enrolled',
+        description: 'Please register your face first.',
         variant: 'destructive',
       });
       return;
     }
-    const verified = await verify(staffMember.biometric_credential_id);
-    if (verified) {
-      checkOutMutation.mutate();
+    setFaceCaptureMode('verify-in');
+    setShowFaceCapture(true);
+  };
+
+  // Handle face check-out
+  const handleCheckOut = () => {
+    if (!staffMember?.face_image_url) {
+      toast({
+        title: 'Face not enrolled',
+        description: 'Please register your face first.',
+        variant: 'destructive',
+      });
+      return;
     }
+    setFaceCaptureMode('verify-out');
+    setShowFaceCapture(true);
   };
 
   const checkInMutation = useMutation({
@@ -137,32 +171,32 @@ export default function MarkAttendance() {
 
       <div className="rounded-xl border bg-card p-6 text-center space-y-6">
         <div className="flex h-24 w-24 mx-auto items-center justify-center rounded-full gradient-primary">
-          <Fingerprint className="h-12 w-12 text-primary-foreground" />
+          <Camera className="h-12 w-12 text-primary-foreground" />
         </div>
 
         {/* Show enrollment if not enrolled */}
-        {!staffMember?.biometric_credential_id ? (
+        {!staffMember?.face_image_url ? (
           <div className="space-y-4">
             <div className="bg-warning/10 text-warning rounded-lg p-3 text-sm text-center">
-              You need to enroll your biometric first
+              You need to register your face first
             </div>
             <Button
               size="lg"
               className="w-full"
               disabled={isEnrolling}
-              onClick={handleEnroll}
+              onClick={handleEnrollClick}
             >
               {isEnrolling ? (
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" />
               ) : (
                 <ScanFace className="h-5 w-5 mr-2" />
               )}
-              Enroll Fingerprint / Face
+              Register Face
             </Button>
           </div>
         ) : !todayAttendance ? (
-          <Button size="lg" className="w-full" onClick={handleCheckIn} disabled={checkInMutation.isPending || isAuthenticating}>
-            {checkInMutation.isPending || isAuthenticating ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <ScanFace className="h-5 w-5 mr-2" />}
+          <Button size="lg" className="w-full" onClick={handleCheckIn} disabled={checkInMutation.isPending || isVerifying}>
+            {checkInMutation.isPending || isVerifying ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <ScanFace className="h-5 w-5 mr-2" />}
             Verify & Check In
           </Button>
         ) : !todayAttendance.check_out ? (
@@ -170,8 +204,8 @@ export default function MarkAttendance() {
             <div className="text-success flex items-center justify-center gap-2">
               <CheckCircle className="h-5 w-5" /> Checked in at {todayAttendance.check_in}
             </div>
-            <Button size="lg" variant="outline" className="w-full" onClick={handleCheckOut} disabled={checkOutMutation.isPending || isAuthenticating}>
-              {checkOutMutation.isPending || isAuthenticating ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Fingerprint className="h-5 w-5 mr-2" />}
+            <Button size="lg" variant="outline" className="w-full" onClick={handleCheckOut} disabled={checkOutMutation.isPending || isVerifying}>
+              {checkOutMutation.isPending || isVerifying ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Camera className="h-5 w-5 mr-2" />}
               Verify & Check Out
             </Button>
           </>
@@ -183,9 +217,19 @@ export default function MarkAttendance() {
           </div>
         )}
         <p className="text-xs text-center text-muted-foreground mt-4">
-          Use your enrolled fingerprint or face to verify
+          Use your registered face to verify identity
         </p>
       </div>
+
+      {/* Face Capture Modal */}
+      {showFaceCapture && (
+        <FaceCapture
+          mode={faceCaptureMode === 'enroll' ? 'enroll' : 'verify'}
+          onCapture={handleFaceCaptured}
+          onCancel={() => setShowFaceCapture(false)}
+          isProcessing={isEnrolling || isVerifying}
+        />
+      )}
     </div>
   );
 }
