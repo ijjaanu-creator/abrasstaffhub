@@ -28,11 +28,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userRole, setUserRole] = useState<AppRole | null>(null);
 
   const fetchUserRole = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .maybeSingle();
+    const timeoutMs = 5000;
+
+    const { data, error } = await Promise.race([
+      supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('role lookup timeout')), timeoutMs)
+      ),
+    ]);
+
+    if (error) {
+      throw error;
+    }
 
     if (data) {
       setUserRole(data.role as AppRole);
@@ -53,11 +64,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Defer fetching role to avoid deadlock
         setTimeout(() => {
           setIsRoleLoading(true);
+
+          // Guard role fetch so UI can't get stuck
+          const roleWatchdog = setTimeout(() => {
+            setUserRole(null);
+            setIsRoleLoading(false);
+          }, 7000);
+
           fetchUserRole(session.user.id)
             .catch(() => {
               setUserRole(null);
             })
             .finally(() => {
+              clearTimeout(roleWatchdog);
               setIsRoleLoading(false);
             });
         }, 0);
@@ -94,9 +113,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (session?.user) {
           setIsRoleLoading(true);
+
+          const roleWatchdog = setTimeout(() => {
+            setUserRole(null);
+            setIsRoleLoading(false);
+          }, 7000);
+
           try {
             await fetchUserRole(session.user.id);
           } finally {
+            clearTimeout(roleWatchdog);
             setIsRoleLoading(false);
           }
         } else {
