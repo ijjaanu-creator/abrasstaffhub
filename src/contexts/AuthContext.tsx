@@ -139,14 +139,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (authData.user) {
-      // Link the staff member to the new user
-      const { error: updateError } = await supabase
-        .from('staff_members')
-        .update({ user_id: authData.user.id, email })
-        .eq('id', staffMember.id);
+      // Link the staff member to the new user using secure function (bypasses RLS)
+      const { error: linkError } = await supabase.rpc('link_staff_to_user', {
+        _staff_id: staffMember.id,
+        _user_id: authData.user.id,
+        _email: email,
+      });
 
-      if (updateError) {
-        console.error('Error linking staff member:', updateError);
+      if (linkError) {
+        console.error('Error linking staff member:', linkError);
       }
 
       // Add staff role
