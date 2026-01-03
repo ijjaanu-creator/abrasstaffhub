@@ -71,8 +71,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // THEN check for existing session
     (async () => {
+      // Guard against rare cases where getSession never resolves (storage/network issues)
+      const watchdog = setTimeout(() => {
+        setIsLoading(false);
+      }, 7000);
+
+      const getSessionWithTimeout = async () => {
+        return await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('getSession timeout')), 5000)
+          ),
+        ]);
+      };
+
       try {
-        const { data } = await supabase.auth.getSession();
+        const { data } = await getSessionWithTimeout();
         const session = data.session;
 
         setSession(session);
@@ -96,6 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUserRole(null);
         setIsRoleLoading(false);
       } finally {
+        clearTimeout(watchdog);
         setIsLoading(false);
       }
     })();
