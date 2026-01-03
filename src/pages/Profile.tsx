@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { User, Mail, Phone, Building2, Briefcase, Calendar, Loader2, Save } from 'lucide-react';
+import { User, Mail, Phone, Building2, Briefcase, Calendar, Loader2, Save, Camera, BadgeCheck } from 'lucide-react';
 
 export default function Profile() {
   const { user } = useAuth();
@@ -14,6 +14,8 @@ export default function Profile() {
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({ name: '', phone: '' });
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['my-profile', user?.id],
@@ -63,6 +65,54 @@ export default function Profile() {
     },
   });
 
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user?.id) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Please select an image file', variant: 'destructive' });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'Image must be less than 5MB', variant: 'destructive' });
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/avatar.${fileExt}`;
+
+      // Upload file
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // Update profile with avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: `${publicUrl}?t=${Date.now()}` })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      queryClient.invalidateQueries({ queryKey: ['my-profile'] });
+      toast({ title: 'Avatar updated successfully' });
+    } catch (error: any) {
+      toast({ title: 'Error uploading avatar', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateProfileMutation.mutate(formData);
@@ -79,18 +129,105 @@ export default function Profile() {
         <p className="mt-1 text-sm text-muted-foreground">View and update your profile information</p>
       </div>
 
-      {/* Profile Card */}
-      <div className="rounded-xl border bg-card p-6">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full gradient-primary text-primary-foreground font-display text-2xl font-bold">
-            {profile?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold">{profile?.name || 'User'}</h2>
-            <p className="text-muted-foreground">{profile?.email}</p>
+      {/* Staff ID Card */}
+      {staffMember && (
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 p-1 shadow-xl">
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
+          <div className="relative rounded-xl bg-card/95 backdrop-blur p-6">
+            <div className="flex items-start justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <BadgeCheck className="h-6 w-6 text-primary" />
+                <span className="font-display font-bold text-lg text-primary">STAFF ID CARD</span>
+              </div>
+              <span className="text-xs text-muted-foreground">ID: {staffMember.employee_id}</span>
+            </div>
+
+            <div className="flex gap-6">
+              {/* Avatar Section */}
+              <div className="flex-shrink-0">
+                <div className="relative group">
+                  <div className="h-28 w-28 rounded-xl overflow-hidden border-2 border-primary/20 bg-muted">
+                    {profile?.avatar_url ? (
+                      <img 
+                        src={profile.avatar_url} 
+                        alt="Avatar" 
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/10">
+                        <span className="font-display text-3xl font-bold text-primary">
+                          {profile?.name?.charAt(0) || staffMember.name?.charAt(0) || 'U'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingAvatar}
+                    className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl cursor-pointer"
+                  >
+                    {isUploadingAvatar ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-white" />
+                    ) : (
+                      <Camera className="h-6 w-6 text-white" />
+                    )}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    className="hidden"
+                  />
+                </div>
+                <p className="text-xs text-center text-muted-foreground mt-2">Click to change</p>
+              </div>
+
+              {/* Info Section */}
+              <div className="flex-1 space-y-3">
+                <div>
+                  <h2 className="font-display text-xl font-bold text-foreground">{staffMember.name}</h2>
+                  <p className="text-sm text-primary font-medium">{staffMember.position}</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Building2 className="h-4 w-4" />
+                    <span>{staffMember.department}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Phone className="h-4 w-4" />
+                    <span>{staffMember.phone}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Mail className="h-4 w-4" />
+                    <span className="truncate">{staffMember.email || profile?.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    <span>Since {new Date(staffMember.join_date).getFullYear()}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`h-2 w-2 rounded-full ${staffMember.status === 'active' ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                <span className="text-xs text-muted-foreground capitalize">{staffMember.status}</span>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                Shift: {staffMember.shift_start?.slice(0, 5)} - {staffMember.shift_end?.slice(0, 5)}
+              </span>
+            </div>
           </div>
         </div>
+      )}
 
+      {/* Profile Edit Card */}
+      <div className="rounded-xl border bg-card p-6">
+        <h3 className="font-semibold mb-4">Account Information</h3>
+        
         {isEditing ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -124,6 +261,10 @@ export default function Profile() {
         ) : (
           <div className="space-y-4">
             <div className="flex items-center gap-3 text-muted-foreground">
+              <User className="h-5 w-5" />
+              <span>{profile?.name}</span>
+            </div>
+            <div className="flex items-center gap-3 text-muted-foreground">
               <Mail className="h-5 w-5" />
               <span>{profile?.email}</span>
             </div>
@@ -137,31 +278,6 @@ export default function Profile() {
           </div>
         )}
       </div>
-
-      {/* Staff Info */}
-      {staffMember && (
-        <div className="rounded-xl border bg-card p-6">
-          <h3 className="font-semibold mb-4">Employment Details</h3>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <User className="h-5 w-5" />
-              <span>Employee ID: {staffMember.employee_id}</span>
-            </div>
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <Briefcase className="h-5 w-5" />
-              <span>{staffMember.position}</span>
-            </div>
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <Building2 className="h-5 w-5" />
-              <span>{staffMember.department}</span>
-            </div>
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <Calendar className="h-5 w-5" />
-              <span>Joined {new Date(staffMember.join_date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
