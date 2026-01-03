@@ -4,6 +4,7 @@ import { AttendanceOverview } from '@/components/dashboard/AttendanceOverview';
 import { PayrollSummary } from '@/components/dashboard/PayrollSummary';
 import { FaceReregistrationRequests } from '@/components/dashboard/FaceReregistrationRequests';
 import { ExecutiveLocations } from '@/components/dashboard/ExecutiveLocations';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Users, UserCheck, UserX, Clock, Wallet, IndianRupee } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -105,21 +106,29 @@ export default function AdminDashboard() {
 
       {/* Face Re-registration Requests */}
       <div className="animate-fade-in delay-100">
-        <FaceReregistrationRequests />
+        <ErrorBoundary>
+          <FaceReregistrationRequests />
+        </ErrorBoundary>
       </div>
 
       {/* Executive Live Locations */}
       <div className="animate-fade-in delay-150">
-        <ExecutiveLocations />
+        <ErrorBoundary>
+          <ExecutiveLocations />
+        </ErrorBoundary>
       </div>
 
       {/* Main Content */}
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="animate-fade-in delay-200">
-          <AttendanceOverview />
+          <ErrorBoundary>
+            <AttendanceOverview />
+          </ErrorBoundary>
         </div>
         <div className="animate-fade-in delay-300">
-          <PayrollSummary />
+          <ErrorBoundary>
+            <PayrollSummary />
+          </ErrorBoundary>
         </div>
       </div>
     </div>
