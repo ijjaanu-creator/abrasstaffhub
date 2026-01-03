@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Camera, RotateCcw, Check, Loader2, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -16,20 +16,29 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
   const { toast } = useToast();
+
+  // Attach stream to video element when both are available
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().then(() => {
+        setCameraReady(true);
+      }).catch(err => {
+        console.error('Video play error:', err);
+      });
+    }
+  }, [stream]);
 
   const startCamera = useCallback(async () => {
     setIsStarting(true);
+    setCameraReady(false);
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false,
       });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        await videoRef.current.play();
-      }
       setStream(mediaStream);
     } catch (error: any) {
       console.error('Camera error:', error);
@@ -73,6 +82,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
 
   const retake = useCallback(() => {
     setCapturedImage(null);
+    setCameraReady(false);
     startCamera();
   }, [startCamera]);
 
@@ -125,33 +135,47 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
               alt="Captured face"
               className="w-full h-full object-cover"
             />
-          ) : stream ? (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover absolute inset-0"
-              style={{ transform: 'scaleX(-1)' }}
-            />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center gap-4 p-6 text-center">
-              <Camera className="h-16 w-16 text-muted-foreground" />
-              <div>
-                <p className="font-medium">Camera not started</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Position your face within the oval guide
-                </p>
-              </div>
-              <Button onClick={startCamera} disabled={isStarting}>
-                {isStarting ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Camera className="h-4 w-4 mr-2" />
-                )}
-                Start Camera
-              </Button>
-            </div>
+            <>
+              {/* Video element - always present when stream exists */}
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`w-full h-full object-cover absolute inset-0 ${stream && cameraReady ? 'opacity-100' : 'opacity-0'}`}
+                style={{ transform: 'scaleX(-1)' }}
+              />
+              
+              {/* Start camera button or loading state */}
+              {!stream && (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-4 p-6 text-center">
+                  <Camera className="h-16 w-16 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium text-foreground">Camera not started</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Position your face within the oval guide
+                    </p>
+                  </div>
+                  <Button onClick={startCamera} disabled={isStarting}>
+                    {isStarting ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4 mr-2" />
+                    )}
+                    Start Camera
+                  </Button>
+                </div>
+              )}
+              
+              {/* Loading indicator while camera initializes */}
+              {stream && !cameraReady && (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-4">
+                  <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Initializing camera...</p>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -180,7 +204,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
               {isProcessing ? 'Processing...' : 'Confirm'}
             </Button>
           </div>
-        ) : stream ? (
+        ) : stream && cameraReady ? (
           <Button className="w-full" size="lg" onClick={capturePhoto}>
             <Camera className="h-5 w-5 mr-2" />
             Capture Photo
