@@ -3,13 +3,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Fingerprint, Clock, CheckCircle, Loader2 } from 'lucide-react';
+import { useBiometricAuth } from '@/hooks/use-biometric-auth';
+import { Fingerprint, Clock, CheckCircle, Loader2, ScanFace } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function MarkAttendance() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { authenticate, isAuthenticating } = useBiometricAuth();
   const today = format(new Date(), 'yyyy-MM-dd');
 
   const { data: staffMember, isLoading: staffLoading } = useQuery({
@@ -38,6 +40,22 @@ export default function MarkAttendance() {
     },
     enabled: !!staffMember?.id,
   });
+
+  // Handle biometric check-in
+  const handleCheckIn = async () => {
+    const verified = await authenticate();
+    if (verified) {
+      checkInMutation.mutate();
+    }
+  };
+
+  // Handle biometric check-out
+  const handleCheckOut = async () => {
+    const verified = await authenticate();
+    if (verified) {
+      checkOutMutation.mutate();
+    }
+  };
 
   const checkInMutation = useMutation({
     mutationFn: async () => {
@@ -100,18 +118,18 @@ export default function MarkAttendance() {
         </div>
 
         {!todayAttendance ? (
-          <Button size="lg" className="w-full" onClick={() => checkInMutation.mutate()} disabled={checkInMutation.isPending}>
-            {checkInMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Clock className="h-5 w-5 mr-2" />}
-            Check In
+          <Button size="lg" className="w-full" onClick={handleCheckIn} disabled={checkInMutation.isPending || isAuthenticating}>
+            {checkInMutation.isPending || isAuthenticating ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <ScanFace className="h-5 w-5 mr-2" />}
+            Verify & Check In
           </Button>
         ) : !todayAttendance.check_out ? (
           <>
             <div className="text-success flex items-center justify-center gap-2">
               <CheckCircle className="h-5 w-5" /> Checked in at {todayAttendance.check_in}
             </div>
-            <Button size="lg" variant="outline" className="w-full" onClick={() => checkOutMutation.mutate()} disabled={checkOutMutation.isPending}>
-              {checkOutMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
-              Check Out
+            <Button size="lg" variant="outline" className="w-full" onClick={handleCheckOut} disabled={checkOutMutation.isPending || isAuthenticating}>
+              {checkOutMutation.isPending || isAuthenticating ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Fingerprint className="h-5 w-5 mr-2" />}
+              Verify & Check Out
             </Button>
           </>
         ) : (
@@ -121,6 +139,9 @@ export default function MarkAttendance() {
             <p className="text-sm text-muted-foreground">In: {todayAttendance.check_in} | Out: {todayAttendance.check_out}</p>
           </div>
         )}
+        <p className="text-xs text-center text-muted-foreground mt-4">
+          Use fingerprint or face recognition to verify your identity
+        </p>
       </div>
     </div>
   );
