@@ -21,7 +21,7 @@ export function AttendanceOverview() {
         .from('attendance_records')
         .select(`
           *,
-          staff_members (id, name, position)
+          staff_members (id, name, position, shift_start, shift_end)
         `)
         .eq('date', today)
         .order('check_in', { ascending: false });
@@ -65,6 +65,19 @@ export function AttendanceOverview() {
             const config = statusConfig[record.status as keyof typeof statusConfig] || statusConfig.present;
             const StatusIcon = config.icon;
 
+            // Calculate display work hours
+            let displayWorkHours = record.work_hours;
+            if (!record.check_out && record.check_in && record.staff_members?.shift_end) {
+              // Calculate hours from check_in to shift_end
+              const [checkInH, checkInM] = record.check_in.split(':').map(Number);
+              const [shiftEndH, shiftEndM] = record.staff_members.shift_end.split(':').map(Number);
+              const checkInMinutes = checkInH * 60 + checkInM;
+              const shiftEndMinutes = shiftEndH * 60 + shiftEndM;
+              if (shiftEndMinutes > checkInMinutes) {
+                displayWorkHours = (shiftEndMinutes - checkInMinutes) / 60;
+              }
+            }
+
             return (
               <div
                 key={record.id}
@@ -86,11 +99,15 @@ export function AttendanceOverview() {
                 <div className="flex items-center gap-4">
                   <div className="text-right">
                     <p className="text-sm font-medium text-foreground">
-                      {record.check_in || '--:--'} - {record.check_out || '--:--'}
+                      {record.check_in || '--:--'} - {record.check_out || (record.staff_members?.shift_end?.slice(0, 5) || '--:--')}
+                      {!record.check_out && record.staff_members?.shift_end && (
+                        <span className="text-xs text-muted-foreground ml-1">(shift end)</span>
+                      )}
                     </p>
-                    {record.work_hours !== undefined && Number(record.work_hours) > 0 && (
+                    {displayWorkHours !== undefined && Number(displayWorkHours) > 0 && (
                       <p className="text-xs text-muted-foreground">
-                        {Number(record.work_hours).toFixed(1)} hours
+                        {Number(displayWorkHours).toFixed(1)} hours
+                        {!record.check_out && ' (estimated)'}
                       </p>
                     )}
                   </div>
