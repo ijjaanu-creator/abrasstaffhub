@@ -175,18 +175,27 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Some devices ignore the "ideal" constraint and return very large frames.
+    // Clamp to a reasonable size so the verification request doesn't exceed payload limits.
+    const maxDim = 720;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const scale = Math.min(1, maxDim / Math.max(vw, vh));
+
+    canvas.width = Math.round(vw * scale);
+    canvas.height = Math.round(vh * scale);
 
     // Mirror the image for selfie view
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
+    const jpegQuality = mode === 'verify' ? 0.72 : 0.8;
+    const imageBase64 = canvas.toDataURL('image/jpeg', jpegQuality);
     setCapturedImage(imageBase64);
     stopCamera();
-  }, [stopCamera]);
+  }, [stopCamera, mode]);
 
   const retake = useCallback(() => {
     setCapturedImage(null);
