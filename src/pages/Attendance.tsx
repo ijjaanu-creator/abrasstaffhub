@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { exportToCSV, formatAttendanceForExport } from '@/lib/exportUtils';
 import {
   Search,
   Calendar,
@@ -26,6 +28,7 @@ const statusConfig: Record<string, { icon: any; label: string; className: string
 export default function Attendance() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const { toast } = useToast();
 
   const { data: attendanceRecords = [], isLoading } = useQuery({
     queryKey: ['attendance-records', selectedDate],
@@ -80,7 +83,20 @@ export default function Attendance() {
             Track and manage staff attendance records
           </p>
         </div>
-        <Button variant="outline" size="lg" className="w-full sm:w-auto">
+        <Button 
+          variant="outline" 
+          size="lg" 
+          className="w-full sm:w-auto"
+          onClick={() => {
+            if (filteredAttendance.length === 0) {
+              toast({ title: 'No data to export', variant: 'destructive' });
+              return;
+            }
+            const data = formatAttendanceForExport(filteredAttendance);
+            exportToCSV(data, `attendance_${selectedDate}`);
+            toast({ title: 'Attendance report exported successfully!' });
+          }}
+        >
           <Download className="h-5 w-5 mr-2" />
           Export Report
         </Button>

@@ -2,7 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { AttendanceOverview } from '@/components/dashboard/AttendanceOverview';
 import { PayrollSummary } from '@/components/dashboard/PayrollSummary';
-import { Users, UserCheck, UserX, Clock, Wallet, DollarSign } from 'lucide-react';
+import { Users, UserCheck, UserX, Clock, Wallet, IndianRupee } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -95,7 +95,7 @@ export default function AdminDashboard() {
         <StatsCard
           title="Total Payroll"
           value={`₹${((stats?.totalPayrollAmount || 0) / 1000).toFixed(1)}K`}
-          icon={DollarSign}
+          icon={IndianRupee}
           variant="primary"
           className="animate-fade-in delay-500"
         />

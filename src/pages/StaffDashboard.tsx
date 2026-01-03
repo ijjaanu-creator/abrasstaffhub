@@ -54,6 +54,27 @@ export default function StaffDashboard() {
     enabled: !!staffMember?.id,
   });
 
+  // Fetch recent attendance (last 7 days)
+  const { data: recentAttendance = [] } = useQuery({
+    queryKey: ['myRecentAttendance', staffMember?.id],
+    queryFn: async () => {
+      if (!staffMember?.id) return [];
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 6);
+      
+      const { data } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .eq('staff_id', staffMember.id)
+        .gte('date', startDate.toISOString().split('T')[0])
+        .lte('date', endDate.toISOString().split('T')[0])
+        .order('date', { ascending: false });
+      return data || [];
+    },
+    enabled: !!staffMember?.id,
+  });
+
   // Fetch latest payroll
   const { data: latestPayroll } = useQuery({
     queryKey: ['myLatestPayroll', staffMember?.id],
@@ -253,32 +274,32 @@ export default function StaffDashboard() {
               <div className="flex items-center justify-between py-2">
                 <span className="text-muted-foreground">Base Salary</span>
                 <span className="font-medium text-foreground">
-                  AED {Number(latestPayroll.base_salary).toLocaleString()}
+                  ₹{Number(latestPayroll.base_salary).toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center justify-between py-2">
                 <span className="text-muted-foreground">Overtime</span>
                 <span className="font-medium text-success">
-                  +AED {Number(latestPayroll.overtime).toLocaleString()}
+                  +₹{Number(latestPayroll.overtime).toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center justify-between py-2">
                 <span className="text-muted-foreground">Deductions</span>
                 <span className="font-medium text-destructive">
-                  -AED {Number(latestPayroll.deductions).toLocaleString()}
+                  -₹{Number(latestPayroll.deductions).toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center justify-between py-2">
                 <span className="text-muted-foreground">Bonus</span>
                 <span className="font-medium text-success">
-                  +AED {Number(latestPayroll.bonus).toLocaleString()}
+                  +₹{Number(latestPayroll.bonus).toLocaleString()}
                 </span>
               </div>
               <div className="border-t border-border pt-4">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-foreground">Net Salary</span>
                   <span className="text-2xl font-bold font-display text-primary">
-                    AED {Number(latestPayroll.net_salary).toLocaleString()}
+                    ₹{Number(latestPayroll.net_salary).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -325,49 +346,50 @@ export default function StaffDashboard() {
               </tr>
             </thead>
             <tbody>
-              {[...Array(5)].map((_, i) => {
-                const date = new Date();
-                date.setDate(date.getDate() - i);
-                const isToday = i === 0;
-                const record = isToday ? todayAttendance : null;
-
-                return (
-                  <tr key={i} className="border-b border-border/50 last:border-0">
+              {recentAttendance.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                    No attendance records yet
+                  </td>
+                </tr>
+              ) : (
+                recentAttendance.map((record: any) => (
+                  <tr key={record.id} className="border-b border-border/50 last:border-0">
                     <td className="py-3 text-sm text-foreground">
-                      {date.toLocaleDateString('en-US', {
+                      {new Date(record.date).toLocaleDateString('en-US', {
                         weekday: 'short',
                         month: 'short',
                         day: 'numeric',
                       })}
                     </td>
                     <td className="py-3 text-sm text-foreground">
-                      {record?.check_in || (i === 0 ? '--:--' : '09:00')}
+                      {record.check_in || '--:--'}
                     </td>
                     <td className="py-3 text-sm text-foreground">
-                      {record?.check_out || (i === 0 ? '--:--' : '18:00')}
+                      {record.check_out || '--:--'}
                     </td>
                     <td className="py-3 text-sm text-foreground">
-                      {record?.work_hours ? Number(record.work_hours).toFixed(1) : (i === 0 ? '0' : '9')}h
+                      {record.work_hours ? Number(record.work_hours).toFixed(1) : '0'}h
                     </td>
                     <td className="py-3">
                       <span
                         className={cn(
                           'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                          record?.status === 'present' || i !== 0
+                          record.status === 'present'
                             ? 'bg-success/10 text-success'
-                            : record?.status === 'late'
+                            : record.status === 'late'
                             ? 'bg-warning/10 text-warning'
-                            : record?.status === 'absent'
+                            : record.status === 'absent'
                             ? 'bg-destructive/10 text-destructive'
                             : 'bg-muted text-muted-foreground'
                         )}
                       >
-                        {record?.status || (i === 0 ? 'Pending' : 'Present')}
+                        {record.status || 'Pending'}
                       </span>
                     </td>
                   </tr>
-                );
-              })}
+                ))
+              )}
             </tbody>
           </table>
         </div>

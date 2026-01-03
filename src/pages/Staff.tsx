@@ -14,7 +14,7 @@ import {
   Phone,
   Building2,
   Calendar,
-  DollarSign,
+  IndianRupee,
   Loader2,
   X,
 } from 'lucide-react';
@@ -186,6 +186,9 @@ export default function Staff() {
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             required
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="words"
           />
         </div>
         <div className="space-y-2">
@@ -196,6 +199,8 @@ export default function Staff() {
             onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
             placeholder="EMP001"
             required
+            autoComplete="off"
+            autoCorrect="off"
           />
         </div>
       </div>
@@ -208,16 +213,22 @@ export default function Staff() {
             type="email"
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            autoComplete="off"
+            autoCorrect="off"
+            inputMode="email"
           />
         </div>
         <div className="space-y-2">
           <Label htmlFor="phone">Phone Number *</Label>
           <Input
             id="phone"
+            type="tel"
+            inputMode="tel"
             value={formData.phone}
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
             placeholder="9852553399"
             required
+            autoComplete="off"
           />
         </div>
       </div>
@@ -249,6 +260,8 @@ export default function Staff() {
             value={formData.position}
             onChange={(e) => setFormData({ ...formData, position: e.target.value })}
             required
+            autoComplete="off"
+            autoCorrect="off"
           />
         </div>
       </div>
@@ -258,9 +271,11 @@ export default function Staff() {
         <Input
           id="salary"
           type="number"
+          inputMode="numeric"
           value={formData.salary}
           onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
           required
+          autoComplete="off"
         />
       </div>
 
@@ -425,7 +440,7 @@ export default function Staff() {
             <div className="mt-4 pt-4 border-t border-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <DollarSign className="h-4 w-4" />
+                  <IndianRupee className="h-4 w-4" />
                   <span>Monthly Salary</span>
                 </div>
                 <span className="font-semibold text-foreground">
