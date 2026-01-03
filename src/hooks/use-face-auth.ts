@@ -115,7 +115,7 @@ export function useFaceAuth(): FaceAuthResult {
       });
 
       if (error) {
-        console.error('[face-auth] Verification error:', error);
+        console.error('[face-auth] Verification invoke error:', error);
         toast({
           title: 'Verification failed',
           description: error.message || 'Could not verify your face.',
@@ -124,21 +124,30 @@ export function useFaceAuth(): FaceAuthResult {
         return false;
       }
 
-      if (data.match) {
+      // Server returns 200 even on failures, with { error, reason }
+      if (data?.error) {
         toast({
-          title: 'Identity verified',
-          description: `Face matched with ${Math.round((data.confidence || 0) * 100)}% confidence.`,
-        });
-        return true;
-      } else {
-        toast({
-          title: 'Face not recognized',
-          description: data.reason || 'The captured face does not match your enrolled face.',
+          title: 'Verification failed',
+          description: data.reason || data.error || 'Could not verify your face.',
           variant: 'destructive',
         });
         return false;
       }
 
+      if (data?.match) {
+        toast({
+          title: 'Identity verified',
+          description: `Face matched with ${Math.round((data.confidence || 0) * 100)}% confidence.`,
+        });
+        return true;
+      }
+
+      toast({
+        title: 'Face not recognized',
+        description: data?.reason || 'The captured face does not match your enrolled face.',
+        variant: 'destructive',
+      });
+      return false;
     } catch (error: any) {
       console.error('[face-auth] Verification error:', error);
       toast({
