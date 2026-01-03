@@ -25,13 +25,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userRole, setUserRole] = useState<AppRole | null>(null);
 
   const fetchUserRole = useCallback(async (userId: string) => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
-    if (!error && data) {
+    if (data) {
       setUserRole(data.role as AppRole);
     } else {
       setUserRole(null);
