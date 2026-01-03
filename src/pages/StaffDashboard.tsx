@@ -21,7 +21,7 @@ export default function StaffDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { authenticate, isAuthenticating } = useBiometricAuth();
+  const { verify, isAuthenticating, enroll, isEnrolling } = useBiometricAuth();
   
   const displayName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
 
@@ -96,9 +96,24 @@ export default function StaffDashboard() {
     enabled: !!staffMember?.id,
   });
 
+  // Handle biometric enrollment
+  const handleEnroll = async () => {
+    if (!staffMember) return;
+    await enroll(staffMember.id, staffMember.name);
+    queryClient.invalidateQueries({ queryKey: ['myStaffRecord'] });
+  };
+
   // Handle biometric check-in
   const handleCheckIn = async () => {
-    const verified = await authenticate();
+    if (!staffMember?.biometric_credential_id) {
+      toast({
+        title: 'Biometric not enrolled',
+        description: 'Please enroll your fingerprint or face first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const verified = await verify(staffMember.biometric_credential_id);
     if (verified) {
       checkInMutation.mutate();
     }
@@ -106,7 +121,15 @@ export default function StaffDashboard() {
 
   // Handle biometric check-out
   const handleCheckOut = async () => {
-    const verified = await authenticate();
+    if (!staffMember?.biometric_credential_id) {
+      toast({
+        title: 'Biometric not enrolled',
+        description: 'Please enroll your fingerprint or face first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const verified = await verify(staffMember.biometric_credential_id);
     if (verified) {
       checkOutMutation.mutate();
     }
@@ -240,39 +263,62 @@ export default function StaffDashboard() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3">
-            <Button
-              variant="hero"
-              size="lg"
-              className="w-full"
-              disabled={!!todayAttendance?.check_in || checkInMutation.isPending || isAuthenticating}
-              onClick={handleCheckIn}
-            >
-              {checkInMutation.isPending || isAuthenticating ? (
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              ) : (
-                <ScanFace className="h-5 w-5 mr-2" />
-              )}
-              {todayAttendance?.check_in ? 'Already Checked In' : 'Verify & Check In'}
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-full"
-              disabled={!todayAttendance?.check_in || !!todayAttendance?.check_out || checkOutMutation.isPending || isAuthenticating}
-              onClick={handleCheckOut}
-            >
-              {checkOutMutation.isPending || isAuthenticating ? (
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              ) : (
-                <Fingerprint className="h-5 w-5 mr-2" />
-              )}
-              {todayAttendance?.check_out ? 'Already Checked Out' : 'Verify & Check Out'}
-            </Button>
-            <p className="text-xs text-center text-muted-foreground mt-2">
-              Use fingerprint or face recognition to verify your identity
-            </p>
-          </div>
+          {/* Show enrollment button if not enrolled */}
+          {!staffMember?.biometric_credential_id ? (
+            <div className="space-y-4">
+              <div className="bg-warning/10 text-warning rounded-lg p-3 text-sm text-center">
+                You need to enroll your biometric first
+              </div>
+              <Button
+                variant="hero"
+                size="lg"
+                className="w-full"
+                disabled={isEnrolling}
+                onClick={handleEnroll}
+              >
+                {isEnrolling ? (
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                ) : (
+                  <ScanFace className="h-5 w-5 mr-2" />
+                )}
+                Enroll Fingerprint / Face
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <Button
+                variant="hero"
+                size="lg"
+                className="w-full"
+                disabled={!!todayAttendance?.check_in || checkInMutation.isPending || isAuthenticating}
+                onClick={handleCheckIn}
+              >
+                {checkInMutation.isPending || isAuthenticating ? (
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                ) : (
+                  <ScanFace className="h-5 w-5 mr-2" />
+                )}
+                {todayAttendance?.check_in ? 'Already Checked In' : 'Verify & Check In'}
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full"
+                disabled={!todayAttendance?.check_in || !!todayAttendance?.check_out || checkOutMutation.isPending || isAuthenticating}
+                onClick={handleCheckOut}
+              >
+                {checkOutMutation.isPending || isAuthenticating ? (
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                ) : (
+                  <Fingerprint className="h-5 w-5 mr-2" />
+                )}
+                {todayAttendance?.check_out ? 'Already Checked Out' : 'Verify & Check Out'}
+              </Button>
+              <p className="text-xs text-center text-muted-foreground mt-2">
+                Use your enrolled fingerprint or face to verify
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Salary Overview */}

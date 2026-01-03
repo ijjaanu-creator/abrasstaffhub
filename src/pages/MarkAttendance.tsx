@@ -11,7 +11,7 @@ export default function MarkAttendance() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { authenticate, isAuthenticating } = useBiometricAuth();
+  const { verify, isAuthenticating, enroll, isEnrolling } = useBiometricAuth();
   const today = format(new Date(), 'yyyy-MM-dd');
 
   const { data: staffMember, isLoading: staffLoading } = useQuery({
@@ -41,9 +41,24 @@ export default function MarkAttendance() {
     enabled: !!staffMember?.id,
   });
 
+  // Handle biometric enrollment
+  const handleEnroll = async () => {
+    if (!staffMember) return;
+    await enroll(staffMember.id, staffMember.name);
+    queryClient.invalidateQueries({ queryKey: ['my-staff-record'] });
+  };
+
   // Handle biometric check-in
   const handleCheckIn = async () => {
-    const verified = await authenticate();
+    if (!staffMember?.biometric_credential_id) {
+      toast({
+        title: 'Biometric not enrolled',
+        description: 'Please enroll your fingerprint or face first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const verified = await verify(staffMember.biometric_credential_id);
     if (verified) {
       checkInMutation.mutate();
     }
@@ -51,7 +66,15 @@ export default function MarkAttendance() {
 
   // Handle biometric check-out
   const handleCheckOut = async () => {
-    const verified = await authenticate();
+    if (!staffMember?.biometric_credential_id) {
+      toast({
+        title: 'Biometric not enrolled',
+        description: 'Please enroll your fingerprint or face first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const verified = await verify(staffMember.biometric_credential_id);
     if (verified) {
       checkOutMutation.mutate();
     }
@@ -117,7 +140,27 @@ export default function MarkAttendance() {
           <Fingerprint className="h-12 w-12 text-primary-foreground" />
         </div>
 
-        {!todayAttendance ? (
+        {/* Show enrollment if not enrolled */}
+        {!staffMember?.biometric_credential_id ? (
+          <div className="space-y-4">
+            <div className="bg-warning/10 text-warning rounded-lg p-3 text-sm text-center">
+              You need to enroll your biometric first
+            </div>
+            <Button
+              size="lg"
+              className="w-full"
+              disabled={isEnrolling}
+              onClick={handleEnroll}
+            >
+              {isEnrolling ? (
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+              ) : (
+                <ScanFace className="h-5 w-5 mr-2" />
+              )}
+              Enroll Fingerprint / Face
+            </Button>
+          </div>
+        ) : !todayAttendance ? (
           <Button size="lg" className="w-full" onClick={handleCheckIn} disabled={checkInMutation.isPending || isAuthenticating}>
             {checkInMutation.isPending || isAuthenticating ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <ScanFace className="h-5 w-5 mr-2" />}
             Verify & Check In
@@ -140,7 +183,7 @@ export default function MarkAttendance() {
           </div>
         )}
         <p className="text-xs text-center text-muted-foreground mt-4">
-          Use fingerprint or face recognition to verify your identity
+          Use your enrolled fingerprint or face to verify
         </p>
       </div>
     </div>
