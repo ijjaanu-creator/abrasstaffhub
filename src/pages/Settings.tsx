@@ -8,6 +8,17 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
   Settings2,
   Bell,
   Clock,
@@ -18,6 +29,7 @@ import {
   Plus,
   Trash2,
   FolderOpen,
+  AlertTriangle,
 } from 'lucide-react';
 
 function DepartmentManager() {
@@ -124,6 +136,93 @@ function DepartmentManager() {
             </div>
           ))
         )}
+      </div>
+    </div>
+  );
+}
+
+function DataResetSection() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleResetData = async () => {
+    setIsResetting(true);
+    try {
+      // Delete all attendance records
+      const { error: attendanceError } = await supabase
+        .from('attendance_records')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+      if (attendanceError) throw attendanceError;
+
+      // Delete all payroll records
+      const { error: payrollError } = await supabase
+        .from('payroll_records')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+      if (payrollError) throw payrollError;
+
+      // Invalidate queries to refresh UI
+      queryClient.invalidateQueries({ queryKey: ['todayAttendance'] });
+      queryClient.invalidateQueries({ queryKey: ['recentPayroll'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['payroll'] });
+
+      toast({ title: 'Data reset successfully', description: 'All attendance and payroll records have been cleared.' });
+    } catch (error: any) {
+      toast({ title: 'Error resetting data', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-destructive/30 bg-card p-6 shadow-elegant animate-fade-in delay-500">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
+          <AlertTriangle className="h-5 w-5 text-destructive" />
+        </div>
+        <h3 className="font-display text-lg font-semibold text-foreground">Danger Zone</h3>
+      </div>
+      <div className="space-y-4">
+        <div>
+          <p className="text-sm font-medium text-foreground">Reset All Data</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Permanently delete all attendance and payroll records. Staff members will not be affected.
+          </p>
+        </div>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" disabled={isResetting}>
+              {isResetting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Reset All Records
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete all attendance and payroll records from the database.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleResetData}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Yes, Reset All Data
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
@@ -361,6 +460,9 @@ export default function Settings() {
             )}
           </div>
         </div>
+
+        {/* Data Reset */}
+        <DataResetSection />
       </div>
     </div>
   );
