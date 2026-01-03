@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useBiometricAuth } from '@/hooks/use-biometric-auth';
 import {
   Clock,
   Wallet,
@@ -13,12 +14,14 @@ import {
   CheckCircle2,
   TrendingUp,
   Loader2,
+  ScanFace,
 } from 'lucide-react';
 
 export default function StaffDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { authenticate, isAuthenticating } = useBiometricAuth();
   
   const displayName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
 
@@ -92,6 +95,22 @@ export default function StaffDashboard() {
     },
     enabled: !!staffMember?.id,
   });
+
+  // Handle biometric check-in
+  const handleCheckIn = async () => {
+    const verified = await authenticate();
+    if (verified) {
+      checkInMutation.mutate();
+    }
+  };
+
+  // Handle biometric check-out
+  const handleCheckOut = async () => {
+    const verified = await authenticate();
+    if (verified) {
+      checkOutMutation.mutate();
+    }
+  };
 
   // Check in mutation
   const checkInMutation = useMutation({
@@ -226,30 +245,33 @@ export default function StaffDashboard() {
               variant="hero"
               size="lg"
               className="w-full"
-              disabled={!!todayAttendance?.check_in || checkInMutation.isPending}
-              onClick={() => checkInMutation.mutate()}
+              disabled={!!todayAttendance?.check_in || checkInMutation.isPending || isAuthenticating}
+              onClick={handleCheckIn}
             >
-              {checkInMutation.isPending ? (
+              {checkInMutation.isPending || isAuthenticating ? (
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" />
               ) : (
-                <Fingerprint className="h-5 w-5 mr-2" />
+                <ScanFace className="h-5 w-5 mr-2" />
               )}
-              {todayAttendance?.check_in ? 'Already Checked In' : 'Check In'}
+              {todayAttendance?.check_in ? 'Already Checked In' : 'Verify & Check In'}
             </Button>
             <Button
               variant="outline"
               size="lg"
               className="w-full"
-              disabled={!todayAttendance?.check_in || !!todayAttendance?.check_out || checkOutMutation.isPending}
-              onClick={() => checkOutMutation.mutate()}
+              disabled={!todayAttendance?.check_in || !!todayAttendance?.check_out || checkOutMutation.isPending || isAuthenticating}
+              onClick={handleCheckOut}
             >
-              {checkOutMutation.isPending ? (
+              {checkOutMutation.isPending || isAuthenticating ? (
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" />
               ) : (
-                <Clock className="h-5 w-5 mr-2" />
+                <Fingerprint className="h-5 w-5 mr-2" />
               )}
-              {todayAttendance?.check_out ? 'Already Checked Out' : 'Check Out'}
+              {todayAttendance?.check_out ? 'Already Checked Out' : 'Verify & Check Out'}
             </Button>
+            <p className="text-xs text-center text-muted-foreground mt-2">
+              Use fingerprint or face recognition to verify your identity
+            </p>
           </div>
         </div>
 
