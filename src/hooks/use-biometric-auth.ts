@@ -71,12 +71,11 @@ export function useBiometricAuth(): BiometricAuthResult {
       crypto.getRandomValues(challenge);
 
       // Create credential with biometric
-      const credential = await navigator.credentials.create({
+      const credential = (await navigator.credentials.create({
         publicKey: {
           challenge,
           rp: {
             name: 'Abras Staff Hub',
-            id: window.location.hostname,
           },
           user: {
             id: userId,
@@ -84,19 +83,18 @@ export function useBiometricAuth(): BiometricAuthResult {
             displayName: userName,
           },
           pubKeyCredParams: [
-            { alg: -7, type: 'public-key' },   // ES256
+            { alg: -7, type: 'public-key' }, // ES256
             { alg: -257, type: 'public-key' }, // RS256
           ],
           authenticatorSelection: {
-            authenticatorAttachment: 'platform', // Use built-in biometric (fingerprint/face)
-            userVerification: 'required',        // Require biometric verification
-            residentKey: 'required',             // Store credential on device
-            requireResidentKey: true,
+            authenticatorAttachment: 'platform',
+            userVerification: 'required',
+            residentKey: 'preferred',
           },
           timeout: 60000,
           attestation: 'none',
         },
-      }) as PublicKeyCredential | null;
+      })) as PublicKeyCredential | null;
 
       if (!credential) {
         toast({
@@ -107,17 +105,15 @@ export function useBiometricAuth(): BiometricAuthResult {
         return false;
       }
 
-      // Get the credential ID to store in database
+      // Store the credential ID (the biometric data itself never leaves the device)
       const credentialId = arrayBufferToBase64(credential.rawId);
-      const response = credential.response as AuthenticatorAttestationResponse;
-      const publicKey = arrayBufferToBase64(response.getPublicKey() || new ArrayBuffer(0));
 
       // Save credential to database
       const { error } = await supabase
         .from('staff_members')
         .update({
           biometric_credential_id: credentialId,
-          biometric_public_key: publicKey,
+          biometric_public_key: null,
           biometric_enrolled_at: new Date().toISOString(),
         })
         .eq('id', staffId);
@@ -145,6 +141,12 @@ export function useBiometricAuth(): BiometricAuthResult {
         toast({
           title: 'Enrollment cancelled',
           description: 'Biometric enrollment was cancelled.',
+          variant: 'destructive',
+        });
+      } else if (error.name === 'NotSupportedError') {
+        toast({
+          title: 'Not supported on this device',
+          description: 'This device/browser does not support the required biometric enrollment method.',
           variant: 'destructive',
         });
       } else if (error.name === 'SecurityError') {
@@ -206,7 +208,6 @@ export function useBiometricAuth(): BiometricAuthResult {
           challenge,
           timeout: 60000,
           userVerification: 'required',
-          rpId: window.location.hostname,
           allowCredentials,
         },
       });
