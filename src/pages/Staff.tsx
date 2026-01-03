@@ -176,15 +176,16 @@ export default function Staff() {
       staff.department.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const StaffForm = () => (
+  const formContent = (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="name">Full Name *</Label>
           <Input
             id="name"
+            name="name"
             value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
             required
             autoComplete="off"
             autoCorrect="off"
@@ -195,8 +196,9 @@ export default function Staff() {
           <Label htmlFor="employee_id">Employee ID *</Label>
           <Input
             id="employee_id"
+            name="employee_id"
             value={formData.employee_id}
-            onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
+            onChange={(e) => setFormData((prev) => ({ ...prev, employee_id: e.target.value }))}
             placeholder="EMP001"
             required
             autoComplete="off"
@@ -210,9 +212,10 @@ export default function Staff() {
           <Label htmlFor="email">Email</Label>
           <Input
             id="email"
+            name="email"
             type="email"
             value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
             autoComplete="off"
             autoCorrect="off"
             inputMode="email"
@@ -222,10 +225,11 @@ export default function Staff() {
           <Label htmlFor="phone">Phone Number *</Label>
           <Input
             id="phone"
+            name="phone"
             type="tel"
             inputMode="tel"
             value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
             placeholder="9852553399"
             required
             autoComplete="off"
@@ -238,7 +242,7 @@ export default function Staff() {
           <Label htmlFor="department">Department *</Label>
           <Select
             value={formData.department}
-            onValueChange={(value) => setFormData({ ...formData, department: value })}
+            onValueChange={(value) => setFormData((prev) => ({ ...prev, department: value }))}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select department" />
@@ -257,8 +261,9 @@ export default function Staff() {
           <Label htmlFor="position">Position *</Label>
           <Input
             id="position"
+            name="position"
             value={formData.position}
-            onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+            onChange={(e) => setFormData((prev) => ({ ...prev, position: e.target.value }))}
             required
             autoComplete="off"
             autoCorrect="off"
@@ -270,10 +275,11 @@ export default function Staff() {
         <Label htmlFor="salary">Monthly Salary (₹) *</Label>
         <Input
           id="salary"
+          name="salary"
           type="number"
           inputMode="numeric"
           value={formData.salary}
-          onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
+          onChange={(e) => setFormData((prev) => ({ ...prev, salary: e.target.value }))}
           required
           autoComplete="off"
         />
@@ -330,7 +336,7 @@ export default function Staff() {
             <DialogHeader>
               <DialogTitle>Add New Staff Member</DialogTitle>
             </DialogHeader>
-            <StaffForm />
+            {formContent}
           </DialogContent>
         </Dialog>
       </div>
@@ -341,7 +347,7 @@ export default function Staff() {
           <DialogHeader>
             <DialogTitle>Edit Staff Member</DialogTitle>
           </DialogHeader>
-          <StaffForm />
+          {formContent}
         </DialogContent>
       </Dialog>
 
