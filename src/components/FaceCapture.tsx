@@ -19,45 +19,106 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
   const [cameraReady, setCameraReady] = useState(false);
   const { toast } = useToast();
 
-  // Attach stream to video element when both are available
-  useEffect(() => {
-    if (stream && videoRef.current) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.play().then(() => {
-        setCameraReady(true);
-      }).catch(err => {
-        console.error('Video play error:', err);
-      });
+  const stopCamera = useCallback(() => {
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+      setStream(null);
     }
+    setCameraReady(false);
+  }, [stream]);
+
+  // Attach stream to the video element when it becomes available
+  useEffect(() => {
+    let cancelled = false;
+
+    const attach = async () => {
+      if (!stream || !videoRef.current) return;
+
+      try {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        if (!cancelled) setCameraReady(true);
+      } catch (err) {
+        console.error('[FaceCapture] video.play error:', err);
+      }
+    };
+
+    attach();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [stream]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stream?.getTracks().forEach((t) => t.stop());
+    };
   }, [stream]);
 
   const startCamera = useCallback(async () => {
+    console.log('[FaceCapture] startCamera clicked');
     setIsStarting(true);
     setCameraReady(false);
+
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
+      if (!window.isSecureContext) {
+        toast({
+          title: 'Camera unavailable in insecure context',
+          description: 'Open this app over HTTPS or localhost to use the camera.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const getUserMedia = navigator.mediaDevices?.getUserMedia;
+      if (!getUserMedia) {
+        toast({
+          title: 'Camera not supported',
+          description: 'Your browser does not support camera access.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Some environments block camera inside embedded iframes
+      if (window.top !== window.self) {
+        toast({
+          title: 'Camera may be blocked in preview',
+          description: 'If this is the embedded preview, open the app in a new tab to allow camera access.',
+        });
+      }
+
+      const mediaStream = await getUserMedia.call(navigator.mediaDevices, {
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false,
       });
+
+      console.log('[FaceCapture] getUserMedia success', {
+        tracks: mediaStream.getTracks().map((t) => ({ kind: t.kind, label: t.label, readyState: t.readyState })),
+      });
+
       setStream(mediaStream);
     } catch (error: any) {
-      console.error('Camera error:', error);
+      console.error('[FaceCapture] Camera error:', error);
+      const name = error?.name || 'CameraError';
+      const message = error?.message || 'Unable to access camera.';
+
       toast({
-        title: 'Camera access denied',
-        description: 'Please allow camera access to use face recognition.',
+        title: `Camera error: ${name}`,
+        description:
+          name === 'NotAllowedError'
+            ? 'Permission denied. Please allow camera access in your browser settings and try again.'
+            : name === 'NotFoundError'
+              ? 'No camera device was found on this device.'
+              : message,
         variant: 'destructive',
       });
     } finally {
       setIsStarting(false);
     }
   }, [toast]);
-
-  const stopCamera = useCallback(() => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-  }, [stream]);
 
   const capturePhoto = useCallback(() => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -69,7 +130,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    
+
     // Mirror the image for selfie view
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
@@ -87,9 +148,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
   }, [startCamera]);
 
   const confirmCapture = useCallback(() => {
-    if (capturedImage) {
-      onCapture(capturedImage);
-    }
+    if (capturedImage) onCapture(capturedImage);
   }, [capturedImage, onCapture]);
 
   const handleCancel = useCallback(() => {
@@ -130,14 +189,9 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
           </div>
 
           {capturedImage ? (
-            <img
-              src={capturedImage}
-              alt="Captured face"
-              className="w-full h-full object-cover"
-            />
+            <img src={capturedImage} alt="Captured face" className="w-full h-full object-cover" />
           ) : (
             <>
-              {/* Video element - always present when stream exists */}
               <video
                 ref={videoRef}
                 autoPlay
@@ -146,16 +200,13 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
                 className={`w-full h-full object-cover absolute inset-0 ${stream && cameraReady ? 'opacity-100' : 'opacity-0'}`}
                 style={{ transform: 'scaleX(-1)' }}
               />
-              
-              {/* Start camera button or loading state */}
+
               {!stream && (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-4 p-6 text-center">
                   <Camera className="h-16 w-16 text-muted-foreground" />
                   <div>
                     <p className="font-medium text-foreground">Camera not started</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Position your face within the oval guide
-                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">Position your face within the oval guide</p>
                   </div>
                   <Button onClick={startCamera} disabled={isStarting}>
                     {isStarting ? (
@@ -167,8 +218,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
                   </Button>
                 </div>
               )}
-              
-              {/* Loading indicator while camera initializes */}
+
               {stream && !cameraReady && (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-4">
                   <Loader2 className="h-10 w-10 animate-spin text-primary" />
