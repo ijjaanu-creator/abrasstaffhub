@@ -17,6 +17,7 @@ import {
   IndianRupee,
   Loader2,
   X,
+  Clock,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -55,6 +56,8 @@ export default function Staff() {
     position: '',
     salary: '',
     employee_id: '',
+    shift_start: '09:00',
+    shift_end: '17:00',
   });
 
   const { data: staffMembers = [], isLoading } = useQuery({
@@ -92,6 +95,8 @@ export default function Staff() {
         position: staffData.position,
         salary: parseFloat(staffData.salary) || 0,
         employee_id: staffData.employee_id,
+        shift_start: staffData.shift_start,
+        shift_end: staffData.shift_end,
       });
       if (error) throw error;
     },
@@ -118,6 +123,8 @@ export default function Staff() {
           position: staffData.position,
           salary: parseFloat(staffData.salary) || 0,
           employee_id: staffData.employee_id,
+          shift_start: staffData.shift_start,
+          shift_end: staffData.shift_end,
         })
         .eq('id', id);
       if (error) throw error;
@@ -156,6 +163,8 @@ export default function Staff() {
       position: '',
       salary: '',
       employee_id: '',
+      shift_start: '09:00',
+      shift_end: '17:00',
     });
   };
 
@@ -168,6 +177,8 @@ export default function Staff() {
       position: staff.position,
       salary: staff.salary.toString(),
       employee_id: staff.employee_id,
+      shift_start: staff.shift_start?.slice(0, 5) || '09:00',
+      shift_end: staff.shift_end?.slice(0, 5) || '17:00',
     });
     setEditingStaff(staff);
   };
@@ -294,6 +305,31 @@ export default function Staff() {
           required
           autoComplete="off"
         />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="shift_start">Shift Start Time *</Label>
+          <Input
+            id="shift_start"
+            name="shift_start"
+            type="time"
+            value={formData.shift_start}
+            onChange={(e) => setFormData((prev) => ({ ...prev, shift_start: e.target.value }))}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="shift_end">Shift End Time *</Label>
+          <Input
+            id="shift_end"
+            name="shift_end"
+            type="time"
+            value={formData.shift_end}
+            onChange={(e) => setFormData((prev) => ({ ...prev, shift_end: e.target.value }))}
+            required
+          />
+        </div>
       </div>
 
       <div className="flex justify-end gap-3 pt-4">
@@ -450,6 +486,10 @@ export default function Staff() {
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4 flex-shrink-0" />
                 <span>Joined {new Date(staff.join_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="h-4 w-4 flex-shrink-0" />
+                <span>Shift: {staff.shift_start?.slice(0, 5) || '09:00'} - {staff.shift_end?.slice(0, 5) || '17:00'}</span>
               </div>
             </div>
 

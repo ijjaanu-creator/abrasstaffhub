@@ -178,6 +178,8 @@ export type Database = {
           phone: string
           position: string
           salary: number
+          shift_end: string | null
+          shift_start: string | null
           status: string
           updated_at: string
           user_id: string | null
@@ -197,6 +199,8 @@ export type Database = {
           phone: string
           position: string
           salary?: number
+          shift_end?: string | null
+          shift_start?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null
@@ -216,6 +220,8 @@ export type Database = {
           phone?: string
           position?: string
           salary?: number
+          shift_end?: string | null
+          shift_start?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null

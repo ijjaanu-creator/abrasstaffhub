@@ -185,7 +185,10 @@ export default function StaffDashboard() {
       if (!staffMember?.id) throw new Error('Staff member not found');
       const today = new Date().toISOString().split('T')[0];
       const now = new Date().toTimeString().slice(0, 5);
-      const isLate = now > '09:00';
+      
+      // Use staff's individual shift start time for late detection
+      const shiftStart = staffMember.shift_start?.slice(0, 5) || '09:00';
+      const isLate = now > shiftStart;
       
       const { error } = await supabase
         .from('attendance_records')
@@ -218,7 +221,14 @@ export default function StaffDashboard() {
       const [checkInHours, checkInMinutes] = checkIn.split(':').map(Number);
       const [checkOutHours, checkOutMinutes] = now.split(':').map(Number);
       const workHours = (checkOutHours + checkOutMinutes / 60) - (checkInHours + checkInMinutes / 60);
-      const overtime = Math.max(0, workHours - 8);
+      
+      // Use staff's individual shift hours for overtime calculation
+      const shiftStart = staffMember?.shift_start?.slice(0, 5) || '09:00';
+      const shiftEnd = staffMember?.shift_end?.slice(0, 5) || '17:00';
+      const [shiftStartH, shiftStartM] = shiftStart.split(':').map(Number);
+      const [shiftEndH, shiftEndM] = shiftEnd.split(':').map(Number);
+      const standardHours = (shiftEndH + shiftEndM / 60) - (shiftStartH + shiftStartM / 60);
+      const overtime = Math.max(0, workHours - standardHours);
       
       const { error } = await supabase
         .from('attendance_records')
