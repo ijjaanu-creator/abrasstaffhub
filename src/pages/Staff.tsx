@@ -70,6 +70,18 @@ export default function Staff() {
     },
   });
 
+  const { data: departments = [] } = useQuery({
+    queryKey: ['departments'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const addStaffMutation = useMutation({
     mutationFn: async (staffData: typeof formData) => {
       const { error } = await supabase.from('staff_members').insert({
@@ -248,12 +260,11 @@ export default function Staff() {
               <SelectValue placeholder="Select department" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Production">Production</SelectItem>
-              <SelectItem value="Packaging">Packaging</SelectItem>
-              <SelectItem value="Quality Control">Quality Control</SelectItem>
-              <SelectItem value="Sales">Sales</SelectItem>
-              <SelectItem value="Administration">Administration</SelectItem>
-              <SelectItem value="Warehouse">Warehouse</SelectItem>
+              {departments.map((dept: any) => (
+                <SelectItem key={dept.id} value={dept.name}>
+                  {dept.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
