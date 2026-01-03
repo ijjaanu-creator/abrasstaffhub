@@ -45,10 +45,35 @@ export function useBiometricAuth(): BiometricAuthResult {
     setIsEnrolling(true);
 
     try {
+      console.log('[biometric] enroll:start', {
+        staffId,
+        isSecureContext: typeof window !== 'undefined' ? window.isSecureContext : undefined,
+        inIframe: typeof window !== 'undefined' ? window.top !== window.self : undefined,
+        hasCredentialsApi: typeof navigator !== 'undefined' ? !!navigator.credentials : undefined,
+      });
+
       if (!isSupported) {
         toast({
           title: 'Biometric not supported',
-          description: 'Your device does not support biometric authentication.',
+          description: 'Your device/browser does not support biometric authentication.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      if (typeof window !== 'undefined' && !window.isSecureContext) {
+        toast({
+          title: 'Biometric requires HTTPS',
+          description: 'Please open the secure (HTTPS) version of this app.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      if (!navigator.credentials?.create) {
+        toast({
+          title: 'Biometric unavailable',
+          description: 'This browser does not support credential creation needed for biometrics.',
           variant: 'destructive',
         });
         return false;
@@ -84,6 +109,13 @@ export function useBiometricAuth(): BiometricAuthResult {
       const userId = new TextEncoder().encode(staffId);
       const challenge = new Uint8Array(32);
       crypto.getRandomValues(challenge);
+
+      toast({
+        title: 'Ready to enroll',
+        description: 'Use your fingerprint/face when the prompt appears.',
+      });
+
+      console.log('[biometric] enroll:create_credential');
 
       // Create credential with biometric
       const credential = (await navigator.credentials.create({
