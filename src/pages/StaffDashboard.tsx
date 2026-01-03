@@ -1,37 +1,23 @@
-import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { StatsCard } from '@/components/dashboard/StatsCard';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { useFaceAuth } from '@/hooks/use-face-auth';
-import { FaceCapture } from '@/components/FaceCapture';
 import {
   Clock,
   Wallet,
   Calendar,
-  Camera,
   CheckCircle2,
   TrendingUp,
-  Loader2,
-  ScanFace,
 } from 'lucide-react';
 
 export default function StaffDashboard() {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const { enrollFace, verifyFace, isEnrolling, isVerifying } = useFaceAuth();
-  
-  const [showFaceCapture, setShowFaceCapture] = useState(false);
-  const [faceCaptureMode, setFaceCaptureMode] = useState<'enroll' | 'verify-in' | 'verify-out'>('enroll');
   
   const displayName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
 
   // Fetch staff member data
-  const { data: staffMember, isLoading: staffMemberLoading } = useQuery({
+  const { data: staffMember } = useQuery({
     queryKey: ['myStaffRecord', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -102,154 +88,6 @@ export default function StaffDashboard() {
     enabled: !!staffMember?.id,
   });
 
-  // Handle face enrollment
-  const handleEnrollClick = () => {
-    if (staffMemberLoading) {
-      toast({
-        title: 'Please wait',
-        description: 'Loading your staff record…',
-      });
-      return;
-    }
-
-    if (!staffMember) {
-      toast({
-        title: 'Staff record not found',
-        description: 'Your account is not linked to a staff record. Please contact admin.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setFaceCaptureMode('enroll');
-    setShowFaceCapture(true);
-  };
-
-  // Handle face capture complete
-  const handleFaceCaptured = async (imageBase64: string) => {
-    if (faceCaptureMode === 'enroll') {
-      if (!user?.id || !staffMember?.id) return;
-      const success = await enrollFace(user.id, staffMember.id, imageBase64);
-      if (success) {
-        queryClient.invalidateQueries({ queryKey: ['myStaffRecord'] });
-        setShowFaceCapture(false);
-      }
-    } else if (faceCaptureMode === 'verify-in') {
-      if (!staffMember?.face_image_url) return;
-      const verified = await verifyFace(staffMember.face_image_url, imageBase64);
-      if (verified) {
-        setShowFaceCapture(false);
-        checkInMutation.mutate();
-      }
-    } else if (faceCaptureMode === 'verify-out') {
-      if (!staffMember?.face_image_url) return;
-      const verified = await verifyFace(staffMember.face_image_url, imageBase64);
-      if (verified) {
-        setShowFaceCapture(false);
-        checkOutMutation.mutate();
-      }
-    }
-  };
-
-  // Handle face check-in
-  const handleCheckIn = () => {
-    if (!staffMember?.face_image_url) {
-      toast({
-        title: 'Face not enrolled',
-        description: 'Please register your face first.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    setFaceCaptureMode('verify-in');
-    setShowFaceCapture(true);
-  };
-
-  // Handle face check-out
-  const handleCheckOut = () => {
-    if (!staffMember?.face_image_url) {
-      toast({
-        title: 'Face not enrolled',
-        description: 'Please register your face first.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    setFaceCaptureMode('verify-out');
-    setShowFaceCapture(true);
-  };
-
-  // Check in mutation
-  const checkInMutation = useMutation({
-    mutationFn: async () => {
-      if (!staffMember?.id) throw new Error('Staff member not found');
-      const today = new Date().toISOString().split('T')[0];
-      const now = new Date().toTimeString().slice(0, 5);
-      
-      // Use staff's individual shift start time for late detection
-      const shiftStart = staffMember.shift_start?.slice(0, 5) || '09:00';
-      const isLate = now > shiftStart;
-      
-      const { error } = await supabase
-        .from('attendance_records')
-        .insert({
-          staff_id: staffMember.id,
-          date: today,
-          check_in: now,
-          status: isLate ? 'late' : 'present',
-        });
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myTodayAttendance'] });
-      toast({ title: 'Checked in successfully!' });
-    },
-    onError: (error: Error) => {
-      toast({ title: 'Check-in failed', description: error.message, variant: 'destructive' });
-    },
-  });
-
-  // Check out mutation
-  const checkOutMutation = useMutation({
-    mutationFn: async () => {
-      if (!todayAttendance?.id) throw new Error('No check-in record found');
-      const now = new Date().toTimeString().slice(0, 5);
-      
-      // Calculate work hours
-      const checkIn = todayAttendance.check_in;
-      const [checkInHours, checkInMinutes] = checkIn.split(':').map(Number);
-      const [checkOutHours, checkOutMinutes] = now.split(':').map(Number);
-      const workHours = (checkOutHours + checkOutMinutes / 60) - (checkInHours + checkInMinutes / 60);
-      
-      // Use staff's individual shift hours for overtime calculation
-      const shiftStart = staffMember?.shift_start?.slice(0, 5) || '09:00';
-      const shiftEnd = staffMember?.shift_end?.slice(0, 5) || '17:00';
-      const [shiftStartH, shiftStartM] = shiftStart.split(':').map(Number);
-      const [shiftEndH, shiftEndM] = shiftEnd.split(':').map(Number);
-      const standardHours = (shiftEndH + shiftEndM / 60) - (shiftStartH + shiftStartM / 60);
-      const overtime = Math.max(0, workHours - standardHours);
-      
-      const { error } = await supabase
-        .from('attendance_records')
-        .update({
-          check_out: now,
-          work_hours: workHours,
-          overtime: overtime,
-        })
-        .eq('id', todayAttendance.id);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myTodayAttendance'] });
-      toast({ title: 'Checked out successfully!' });
-    },
-    onError: (error: Error) => {
-      toast({ title: 'Check-out failed', description: error.message, variant: 'destructive' });
-    },
-  });
-
   const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   return (
@@ -301,96 +139,8 @@ export default function StaffDashboard() {
 
       {/* Main Content */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Mark Attendance Card */}
-        <div className="rounded-xl border border-border bg-card p-6 shadow-elegant animate-fade-in delay-200">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl gradient-primary">
-              <Camera className="h-7 w-7 text-primary-foreground" />
-            </div>
-            <div>
-              <h3 className="font-display text-lg font-semibold text-foreground">
-                Mark Attendance
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Use face recognition to mark your attendance
-              </p>
-            </div>
-          </div>
-
-          {/* Show enrollment button if not enrolled */}
-          {!staffMember?.face_image_url ? (
-            <div className="space-y-4">
-              <div className="bg-warning/10 text-warning rounded-lg p-3 text-sm text-center">
-                You need to register your face first
-              </div>
-              <Button
-                variant="hero"
-                size="lg"
-                className="w-full"
-                disabled={isEnrolling || staffMemberLoading}
-                onClick={handleEnrollClick}
-              >
-                {isEnrolling || staffMemberLoading ? (
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                ) : (
-                  <ScanFace className="h-5 w-5 mr-2" />
-                )}
-                {staffMemberLoading ? 'Loading…' : 'Register Face'}
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <Button
-                variant="hero"
-                size="lg"
-                className="w-full"
-                disabled={!!todayAttendance?.check_in || checkInMutation.isPending || isVerifying}
-                onClick={handleCheckIn}
-              >
-                {checkInMutation.isPending || isVerifying ? (
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                ) : (
-                  <ScanFace className="h-5 w-5 mr-2" />
-                )}
-                {todayAttendance?.check_in ? 'Already Checked In' : 'Verify & Check In'}
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                className="w-full"
-                disabled={!todayAttendance?.check_in || !!todayAttendance?.check_out || checkOutMutation.isPending || isVerifying}
-                onClick={handleCheckOut}
-              >
-                {checkOutMutation.isPending || isVerifying ? (
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                ) : (
-                  <Camera className="h-5 w-5 mr-2" />
-                )}
-                {todayAttendance?.check_out ? 'Already Checked Out' : 'Verify & Check Out'}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full text-muted-foreground"
-                disabled={isEnrolling}
-                onClick={handleEnrollClick}
-              >
-                {isEnrolling ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <ScanFace className="h-4 w-4 mr-2" />
-                )}
-                Re-register Face
-              </Button>
-              <p className="text-xs text-center text-muted-foreground mt-2">
-                Use your registered face to verify identity
-              </p>
-            </div>
-          )}
-        </div>
-
         {/* Salary Overview */}
-        <div className="rounded-xl border border-border bg-card p-6 shadow-elegant animate-fade-in delay-300">
+        <div className="rounded-xl border border-border bg-card p-6 shadow-elegant animate-fade-in delay-200">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-success/10">
@@ -405,7 +155,7 @@ export default function StaffDashboard() {
             </div>
           </div>
 
-          {latestPayroll && (
+          {latestPayroll ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between py-2">
                 <span className="text-muted-foreground">Base Salary</span>
@@ -452,94 +202,96 @@ export default function StaffDashboard() {
                 <span className="capitalize">{latestPayroll.status}</span>
               </div>
             </div>
+          ) : (
+            <p className="text-center text-muted-foreground py-8">No payroll records yet</p>
           )}
         </div>
-      </div>
 
-      {/* Recent Attendance */}
-      <div className="rounded-xl border border-border bg-card p-6 shadow-elegant animate-fade-in delay-400">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-            <Calendar className="h-6 w-6 text-primary" />
+        {/* Recent Attendance */}
+        <div className="rounded-xl border border-border bg-card p-6 shadow-elegant animate-fade-in delay-300">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+              <Calendar className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-display text-lg font-semibold text-foreground">
+                Recent Attendance
+              </h3>
+              <p className="text-sm text-muted-foreground">Your attendance history</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-display text-lg font-semibold text-foreground">
-              Recent Attendance
-            </h3>
-            <p className="text-sm text-muted-foreground">Your attendance history</p>
-          </div>
-        </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Date</th>
-                <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Check In</th>
-                <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Check Out</th>
-                <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Hours</th>
-                <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentAttendance.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-8 text-center text-muted-foreground">
-                    No attendance records yet
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Date
+                  </th>
+                  <th className="py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    In
+                  </th>
+                  <th className="py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Out
+                  </th>
+                  <th className="py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Hours
+                  </th>
+                  <th className="py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Status
+                  </th>
                 </tr>
-              ) : (
-                recentAttendance.map((record: any) => (
-                  <tr key={record.id} className="border-b border-border/50 last:border-0">
-                    <td className="py-3 text-sm text-foreground">
-                      {new Date(record.date).toLocaleDateString('en-US', {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </td>
-                    <td className="py-3 text-sm text-foreground">
-                      {record.check_in || '--:--'}
-                    </td>
-                    <td className="py-3 text-sm text-foreground">
-                      {record.check_out || '--:--'}
-                    </td>
-                    <td className="py-3 text-sm text-foreground">
-                      {record.work_hours ? Number(record.work_hours).toFixed(1) : '0'}h
-                    </td>
-                    <td className="py-3">
-                      <span
-                        className={cn(
-                          'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                          record.status === 'present'
-                            ? 'bg-success/10 text-success'
-                            : record.status === 'late'
-                            ? 'bg-warning/10 text-warning'
-                            : record.status === 'absent'
-                            ? 'bg-destructive/10 text-destructive'
-                            : 'bg-muted text-muted-foreground'
-                        )}
-                      >
-                        {record.status || 'Pending'}
-                      </span>
+              </thead>
+              <tbody>
+                {recentAttendance.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                      No attendance records yet
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  recentAttendance.map((record: any) => (
+                    <tr key={record.id} className="border-b border-border/50 last:border-0">
+                      <td className="py-3 text-sm text-foreground">
+                        {new Date(record.date).toLocaleDateString('en-US', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </td>
+                      <td className="py-3 text-sm text-foreground">
+                        {record.check_in || '--:--'}
+                      </td>
+                      <td className="py-3 text-sm text-foreground">
+                        {record.check_out || '--:--'}
+                      </td>
+                      <td className="py-3 text-sm text-foreground">
+                        {record.work_hours ? Number(record.work_hours).toFixed(1) : '0'}h
+                      </td>
+                      <td className="py-3">
+                        <span
+                          className={cn(
+                            'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                            record.status === 'present'
+                              ? 'bg-success/10 text-success'
+                              : record.status === 'late'
+                              ? 'bg-warning/10 text-warning'
+                              : record.status === 'absent'
+                              ? 'bg-destructive/10 text-destructive'
+                              : 'bg-muted text-muted-foreground'
+                          )}
+                        >
+                          {record.status || 'Pending'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-
-      {/* Face Capture Modal */}
-      {showFaceCapture && (
-        <FaceCapture
-          mode={faceCaptureMode === 'enroll' ? 'enroll' : 'verify'}
-          onCapture={handleFaceCaptured}
-          onCancel={() => setShowFaceCapture(false)}
-          isProcessing={isEnrolling || isVerifying}
-        />
-      )}
     </div>
   );
 }
