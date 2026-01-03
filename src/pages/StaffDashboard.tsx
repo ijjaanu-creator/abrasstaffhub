@@ -26,15 +26,16 @@ export default function StaffDashboard() {
   const displayName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
 
   // Fetch staff member data
-  const { data: staffMember } = useQuery({
+  const { data: staffMember, isLoading: staffMemberLoading } = useQuery({
     queryKey: ['myStaffRecord', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('staff_members')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
+      if (error) throw error;
       return data;
     },
     enabled: !!user?.id,
@@ -98,7 +99,24 @@ export default function StaffDashboard() {
 
   // Handle biometric enrollment
   const handleEnroll = async () => {
-    if (!staffMember) return;
+    if (staffMemberLoading) {
+      toast({
+        title: 'Please wait',
+        description: 'Loading your staff record…',
+      });
+      return;
+    }
+
+    if (!staffMember) {
+      toast({
+        title: 'Staff record not found',
+        description: 'Your account is not linked to a staff record. Please contact admin.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    console.log('[biometric] enroll:click', { staffId: staffMember.id });
     await enroll(staffMember.id, staffMember.name);
     queryClient.invalidateQueries({ queryKey: ['myStaffRecord'] });
   };
@@ -273,15 +291,15 @@ export default function StaffDashboard() {
                 variant="hero"
                 size="lg"
                 className="w-full"
-                disabled={isEnrolling}
+                disabled={isEnrolling || staffMemberLoading}
                 onClick={handleEnroll}
               >
-                {isEnrolling ? (
+                {isEnrolling || staffMemberLoading ? (
                   <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                 ) : (
                   <ScanFace className="h-5 w-5 mr-2" />
                 )}
-                Enroll Fingerprint / Face
+                {staffMemberLoading ? 'Loading…' : 'Enroll Fingerprint / Face'}
               </Button>
             </div>
           ) : (
