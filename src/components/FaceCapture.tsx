@@ -38,19 +38,41 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
 
       try {
         setCameraError(null);
-        videoRef.current.srcObject = stream;
-
-        // Wait for data so we don't end up with a "black" element even though play() resolved.
         const videoEl = videoRef.current;
-        await new Promise<void>((resolve) => {
+        videoEl.srcObject = stream;
+
+        // Wait until the video has dimensions (some browsers never fire loadeddata here)
+        await new Promise<void>((resolve, reject) => {
+          const timeout = window.setTimeout(() => {
+            cleanup();
+            reject(new Error('Camera preview timed out.'));
+          }, 5000);
+
           const onReady = () => {
-            videoEl.removeEventListener('loadeddata', onReady);
-            resolve();
+            if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+              cleanup();
+              resolve();
+            }
           };
+
+          const cleanup = () => {
+            window.clearTimeout(timeout);
+            videoEl.removeEventListener('loadedmetadata', onReady);
+            videoEl.removeEventListener('loadeddata', onReady);
+            videoEl.removeEventListener('canplay', onReady);
+            videoEl.removeEventListener('playing', onReady);
+          };
+
+          videoEl.addEventListener('loadedmetadata', onReady);
           videoEl.addEventListener('loadeddata', onReady);
+          videoEl.addEventListener('canplay', onReady);
+          videoEl.addEventListener('playing', onReady);
+
+          // In case it's already ready
+          onReady();
         });
 
-        await videoRef.current.play();
+        await videoEl.play();
         if (!cancelled) setCameraReady(true);
       } catch (err: any) {
         console.error('[FaceCapture] video attach/play error:', err);
@@ -262,10 +284,30 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
               )}
 
               {stream && !cameraReady && (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-4">
+                <div className="w-full h-full flex flex-col items-center justify-center gap-4 p-6 text-center">
                   <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground">Initializing camera...</p>
-                  {cameraError && <p className="text-xs text-muted-foreground break-words max-w-xs text-center">{cameraError}</p>}
+                  <div>
+                    <p className="text-sm text-muted-foreground">Initializing camera...</p>
+                    {cameraError && (
+                      <p className="text-xs text-muted-foreground break-words max-w-xs text-center mt-2">
+                        {cameraError}
+                      </p>
+                    )}
+                  </div>
+                  <div className="w-full max-w-xs flex flex-col gap-2">
+                    <Button variant="outline" onClick={stopCamera}>
+                      Cancel
+                    </Button>
+                    {isEmbedded && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => window.open(window.location.href, '_blank', 'noopener,noreferrer')}
+                      >
+                        Open in new tab
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
             </>
