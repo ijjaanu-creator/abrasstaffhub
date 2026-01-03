@@ -12,14 +12,14 @@ export default function MarkAttendance() {
   const queryClient = useQueryClient();
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  const { data: staffMember } = useQuery({
+  const { data: staffMember, isLoading: staffLoading } = useQuery({
     queryKey: ['my-staff-record', user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from('staff_members')
         .select('*')
         .eq('user_id', user?.id)
-        .single();
+        .maybeSingle();
       return data;
     },
     enabled: !!user?.id,
@@ -74,8 +74,17 @@ export default function MarkAttendance() {
     },
   });
 
-  if (isLoading) {
+  if (staffLoading || isLoading) {
     return <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
+
+  if (!staffMember) {
+    return (
+      <div className="text-center py-12">
+        <h1 className="font-display text-2xl font-bold">Mark Attendance</h1>
+        <p className="text-muted-foreground mt-2">Your account is not linked to a staff record.</p>
+      </div>
+    );
   }
 
   return (
