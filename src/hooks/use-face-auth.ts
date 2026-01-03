@@ -107,6 +107,17 @@ export function useFaceAuth(): FaceAuthResult {
     setIsVerifying(true);
 
     try {
+      // Ensure user is authenticated before calling the protected edge function
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        toast({
+          title: 'Authentication required',
+          description: 'Please log in to verify your face.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
       const { data, error } = await supabase.functions.invoke('verify-face', {
         body: {
           enrolledImageUrl,
@@ -116,11 +127,21 @@ export function useFaceAuth(): FaceAuthResult {
 
       if (error) {
         console.error('[face-auth] Verification invoke error:', error);
-        toast({
-          title: 'Verification failed',
-          description: error.message || 'Could not verify your face.',
-          variant: 'destructive',
-        });
+        // Check for auth-related errors
+        const errorMsg = error.message?.toLowerCase() || '';
+        if (errorMsg.includes('unauthorized') || errorMsg.includes('401') || errorMsg.includes('jwt')) {
+          toast({
+            title: 'Session expired',
+            description: 'Please log in again to continue.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Verification failed',
+            description: error.message || 'Could not verify your face.',
+            variant: 'destructive',
+          });
+        }
         return false;
       }
 
