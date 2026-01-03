@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +15,119 @@ import {
   Building,
   Save,
   Loader2,
+  Plus,
+  Trash2,
+  FolderOpen,
 } from 'lucide-react';
+
+function DepartmentManager() {
+  const [newDepartment, setNewDepartment] = useState('');
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: departments = [], isLoading } = useQuery({
+    queryKey: ['departments'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const addDepartmentMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const { error } = await supabase.from('departments').insert({ name });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['departments'] });
+      toast({ title: 'Department added successfully' });
+      setNewDepartment('');
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error adding department', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const deleteDepartmentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('departments').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['departments'] });
+      toast({ title: 'Department deleted' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error deleting department', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const handleAddDepartment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newDepartment.trim()) {
+      addDepartmentMutation.mutate(newDepartment.trim());
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-6 shadow-elegant animate-fade-in delay-150">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/50">
+          <FolderOpen className="h-5 w-5 text-secondary-foreground" />
+        </div>
+        <h3 className="font-display text-lg font-semibold text-foreground">Departments</h3>
+      </div>
+
+      <form onSubmit={handleAddDepartment} className="flex gap-2 mb-4">
+        <Input
+          placeholder="New department name"
+          value={newDepartment}
+          onChange={(e) => setNewDepartment(e.target.value)}
+          className="flex-1"
+        />
+        <Button type="submit" size="icon" disabled={addDepartmentMutation.isPending || !newDepartment.trim()}>
+          {addDepartmentMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="h-4 w-4" />
+          )}
+        </Button>
+      </form>
+
+      <div className="space-y-2 max-h-48 overflow-y-auto">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : departments.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">No departments yet</p>
+        ) : (
+          departments.map((dept: any) => (
+            <div
+              key={dept.id}
+              className="flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+            >
+              <span className="text-sm font-medium">{dept.name}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => deleteDepartmentMutation.mutate(dept.id)}
+                disabled={deleteDepartmentMutation.isPending}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function Settings() {
   const { user, isAdmin } = useAuth();
@@ -99,6 +213,9 @@ export default function Settings() {
             </div>
           </div>
         </div>
+
+        {/* Department Management */}
+        <DepartmentManager />
 
         {/* Work Hours Settings */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-elegant animate-fade-in delay-200">
