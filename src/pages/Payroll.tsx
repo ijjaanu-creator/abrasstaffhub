@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { exportToCSV, formatPayrollForExport } from '@/lib/exportUtils';
 import {
   Search,
   Download,
-  DollarSign,
+  IndianRupee,
   Clock,
   CheckCircle,
   AlertCircle,
@@ -97,12 +98,45 @@ export default function Payroll() {
           </p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" size="lg" className="flex-1 sm:flex-none">
+          <Button 
+            variant="outline" 
+            size="lg" 
+            className="flex-1 sm:flex-none"
+            onClick={() => {
+              if (filteredPayroll.length === 0) {
+                toast({ title: 'No data to export', variant: 'destructive' });
+                return;
+              }
+              const data = formatPayrollForExport(filteredPayroll);
+              exportToCSV(data, 'payroll_report');
+              toast({ title: 'Payroll report exported successfully!' });
+            }}
+          >
             <Download className="h-5 w-5 mr-2" />
             Export
           </Button>
-          <Button variant="default" size="lg" className="flex-1 sm:flex-none">
-            <CreditCard className="h-5 w-5 mr-2" />
+          <Button 
+            variant="default" 
+            size="lg" 
+            className="flex-1 sm:flex-none"
+            onClick={async () => {
+              const pendingRecords = payrollRecords.filter((p: any) => p.status === 'pending');
+              if (pendingRecords.length === 0) {
+                toast({ title: 'No pending payroll to process', variant: 'destructive' });
+                return;
+              }
+              for (const record of pendingRecords) {
+                await updateStatusMutation.mutateAsync({ id: record.id, status: 'processed' });
+              }
+              toast({ title: `Processed ${pendingRecords.length} payroll records` });
+            }}
+            disabled={updateStatusMutation.isPending}
+          >
+            {updateStatusMutation.isPending ? (
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+            ) : (
+              <CreditCard className="h-5 w-5 mr-2" />
+            )}
             <span className="hidden sm:inline">Process Payroll</span>
             <span className="sm:hidden">Process</span>
           </Button>
@@ -113,12 +147,12 @@ export default function Payroll() {
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 animate-fade-in delay-100">
         <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 lg:p-4 shadow-elegant">
           <div className="flex h-10 w-10 lg:h-12 lg:w-12 items-center justify-center rounded-xl gradient-primary">
-            <DollarSign className="h-5 w-5 lg:h-6 lg:w-6 text-primary-foreground" />
+            <IndianRupee className="h-5 w-5 lg:h-6 lg:w-6 text-primary-foreground" />
           </div>
           <div className="min-w-0">
             <p className="text-xs lg:text-sm text-muted-foreground">Total</p>
             <p className="text-lg lg:text-xl font-bold font-display text-foreground truncate">
-              {stats.totalPayroll.toLocaleString()}
+              ₹{stats.totalPayroll.toLocaleString()}
             </p>
           </div>
         </div>
@@ -129,7 +163,7 @@ export default function Payroll() {
           <div className="min-w-0">
             <p className="text-xs lg:text-sm text-muted-foreground">Pending</p>
             <p className="text-lg lg:text-xl font-bold font-display text-foreground truncate">
-              {stats.pending.toLocaleString()}
+              ₹{stats.pending.toLocaleString()}
             </p>
           </div>
         </div>
@@ -140,7 +174,7 @@ export default function Payroll() {
           <div className="min-w-0">
             <p className="text-xs lg:text-sm text-muted-foreground">Processed</p>
             <p className="text-lg lg:text-xl font-bold font-display text-foreground truncate">
-              {stats.processed.toLocaleString()}
+              ₹{stats.processed.toLocaleString()}
             </p>
           </div>
         </div>
@@ -151,7 +185,7 @@ export default function Payroll() {
           <div className="min-w-0">
             <p className="text-xs lg:text-sm text-muted-foreground">Paid</p>
             <p className="text-lg lg:text-xl font-bold font-display text-foreground truncate">
-              {stats.paid.toLocaleString()}
+              ₹{stats.paid.toLocaleString()}
             </p>
           </div>
         </div>
