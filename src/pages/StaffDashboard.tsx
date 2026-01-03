@@ -31,7 +31,7 @@ export default function StaffDashboard() {
         .from('staff_members')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       return data;
     },
     enabled: !!user?.id,
@@ -48,7 +48,7 @@ export default function StaffDashboard() {
         .select('*')
         .eq('staff_id', staffMember.id)
         .eq('date', today)
-        .single();
+        .maybeSingle();
       return data;
     },
     enabled: !!staffMember?.id,
@@ -87,7 +87,7 @@ export default function StaffDashboard() {
         .order('year', { ascending: false })
         .order('month', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
       return data;
     },
     enabled: !!staffMember?.id,
