@@ -54,8 +54,23 @@ export function useBiometricAuth(): BiometricAuthResult {
         return false;
       }
 
-      const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-      
+      let available = false;
+      try {
+        available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      } catch (e) {
+        available = false;
+      }
+
+      // WebAuthn is commonly blocked inside embedded iframes (like the in-editor preview)
+      if (typeof window !== 'undefined' && window.top !== window.self) {
+        toast({
+          title: 'Biometric not available in preview',
+          description: 'Open the app in a new tab (not embedded) to enroll your fingerprint/face.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
       if (!available) {
         toast({
           title: 'Biometric not available',
@@ -187,6 +202,16 @@ export function useBiometricAuth(): BiometricAuthResult {
         toast({
           title: 'No biometric enrolled',
           description: 'Please enroll your fingerprint or face first.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      // WebAuthn is commonly blocked inside embedded iframes (like the in-editor preview)
+      if (typeof window !== 'undefined' && window.top !== window.self) {
+        toast({
+          title: 'Biometric not available in preview',
+          description: 'Open the app in a new tab (not embedded) to verify your fingerprint/face.',
           variant: 'destructive',
         });
         return false;
