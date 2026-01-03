@@ -5,7 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, RefreshCw, Clock, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 interface ExecutiveLocation {
   id: string;
@@ -19,8 +22,17 @@ interface ExecutiveLocation {
   check_in: string | null;
 }
 
+// Custom marker icon
+const createCustomIcon = () => {
+  return L.divIcon({
+    className: 'custom-marker',
+    html: `<div style="background-color: hsl(var(--primary)); width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+};
+
 export function ExecutiveLocations() {
-  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
 
   // Fetch current locations for Executive staff who are checked in
   const { data: locations, refetch, isLoading } = useQuery({
@@ -151,19 +163,45 @@ export function ExecutiveLocations() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Map Placeholder - requires Mapbox token */}
-        <div className="relative h-64 bg-muted rounded-lg overflow-hidden">
-          <div className="absolute inset-0 flex items-center justify-center flex-col gap-2">
-            <MapPin className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground text-center px-4">
-              {hasLocations
-                ? 'Map view requires Mapbox token configuration'
-                : 'No executives currently checked in'}
-            </p>
-          </div>
+        {/* Map View */}
+        <div className="relative h-64 rounded-lg overflow-hidden border">
+          {hasLocations ? (
+            <MapContainer
+              center={[locations[0].latitude, locations[0].longitude]}
+              zoom={13}
+              style={{ height: '100%', width: '100%' }}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              {locations.map((loc) => (
+                <Marker
+                  key={loc.id}
+                  position={[loc.latitude, loc.longitude]}
+                  icon={createCustomIcon()}
+                >
+                  <Popup>
+                    <div className="text-sm">
+                      <p className="font-semibold">{loc.staff_name}</p>
+                      <p className="text-muted-foreground">{loc.staff_position}</p>
+                      <p className="text-xs mt-1">
+                        Updated {formatDistanceToNow(new Date(loc.recorded_at), { addSuffix: true })}
+                      </p>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+            </MapContainer>
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center flex-col gap-2 bg-muted">
+              <MapPin className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground text-center px-4">
+                No executives currently checked in
+              </p>
+            </div>
+          )}
         </div>
-
-        {/* Location List */}
         {hasLocations ? (
           <div className="space-y-3">
             <h4 className="font-medium text-sm text-muted-foreground">Currently Tracked</h4>
