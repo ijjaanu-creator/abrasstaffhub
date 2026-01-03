@@ -100,8 +100,8 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
       </div>
 
       {/* Camera View */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4">
-        <div className="relative w-full max-w-sm aspect-[3/4] rounded-2xl overflow-hidden bg-muted">
+      <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-hidden">
+        <div className="relative w-full max-w-sm aspect-[3/4] rounded-2xl overflow-hidden bg-black">
           {/* Face guide overlay */}
           <div className="absolute inset-0 z-10 pointer-events-none">
             <svg className="w-full h-full" viewBox="0 0 300 400">
@@ -131,7 +131,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
               autoPlay
               playsInline
               muted
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover absolute inset-0"
               style={{ transform: 'scaleX(-1)' }}
             />
           ) : (
