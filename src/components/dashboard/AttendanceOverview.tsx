@@ -11,6 +11,33 @@ const statusConfig = {
   half_day: { icon: Clock, label: 'Half Day', className: 'text-muted-foreground bg-muted' },
 };
 
+const OFFICE_CLOSE_TIME = '18:00'; // Office closing time
+
+function calculateWorkHours(checkIn: string | null, checkOut: string | null): { hours: number; isEstimated: boolean } {
+  if (!checkIn) return { hours: 0, isEstimated: false };
+  
+  const [inHours, inMinutes] = checkIn.split(':').map(Number);
+  const checkInMinutes = inHours * 60 + inMinutes;
+  
+  let checkOutMinutes: number;
+  let isEstimated = false;
+  
+  if (checkOut) {
+    const [outHours, outMinutes] = checkOut.split(':').map(Number);
+    checkOutMinutes = outHours * 60 + outMinutes;
+  } else {
+    // Use office closing time if not checked out
+    const [closeHours, closeMinutes] = OFFICE_CLOSE_TIME.split(':').map(Number);
+    checkOutMinutes = closeHours * 60 + closeMinutes;
+    isEstimated = true;
+  }
+  
+  const diffMinutes = checkOutMinutes - checkInMinutes;
+  const hours = Math.max(0, diffMinutes / 60);
+  
+  return { hours, isEstimated };
+}
+
 export function AttendanceOverview() {
   const today = new Date().toISOString().split('T')[0];
 
@@ -64,6 +91,7 @@ export function AttendanceOverview() {
           todayAttendance.map((record: any, index: number) => {
             const config = statusConfig[record.status as keyof typeof statusConfig] || statusConfig.present;
             const StatusIcon = config.icon;
+            const { hours, isEstimated } = calculateWorkHours(record.check_in, record.check_out);
 
             return (
               <div
@@ -86,11 +114,11 @@ export function AttendanceOverview() {
                 <div className="flex items-center gap-4">
                   <div className="text-right">
                     <p className="text-sm font-medium text-foreground">
-                      {record.check_in || '--:--'} - {record.check_out || '--:--'}
+                      {record.check_in || '--:--'} - {record.check_out || OFFICE_CLOSE_TIME}
                     </p>
-                    {record.work_hours !== undefined && Number(record.work_hours) > 0 && (
+                    {hours > 0 && (
                       <p className="text-xs text-muted-foreground">
-                        {Number(record.work_hours).toFixed(1)} hours
+                        {hours.toFixed(1)} hours{isEstimated && ' (until close)'}
                       </p>
                     )}
                   </div>
