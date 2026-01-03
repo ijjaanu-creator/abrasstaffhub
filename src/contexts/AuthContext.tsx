@@ -10,6 +10,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isLoading: boolean;
+  /** True while we are looking up the user's app role in the database */
+  isRoleLoading: boolean;
   userRole: AppRole | null;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
   signup: (email: string, password: string, name: string, phone: string) => Promise<{ error: string | null }>;
@@ -22,6 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRoleLoading, setIsRoleLoading] = useState(false);
   const [userRole, setUserRole] = useState<AppRole | null>(null);
 
   const fetchUserRole = useCallback(async (userId: string) => {
@@ -49,12 +52,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         // Defer fetching role to avoid deadlock
         setTimeout(() => {
-          fetchUserRole(session.user.id).catch(() => {
-            setUserRole(null);
-          });
+          setIsRoleLoading(true);
+          fetchUserRole(session.user.id)
+            .catch(() => {
+              setUserRole(null);
+            })
+            .finally(() => {
+              setIsRoleLoading(false);
+            });
         }, 0);
       } else {
         setUserRole(null);
+        setIsRoleLoading(false);
       }
 
       setIsLoading(false);
@@ -70,15 +79,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          await fetchUserRole(session.user.id);
+          setIsRoleLoading(true);
+          try {
+            await fetchUserRole(session.user.id);
+          } finally {
+            setIsRoleLoading(false);
+          }
         } else {
           setUserRole(null);
+          setIsRoleLoading(false);
         }
       } catch {
         // If anything goes wrong (network/storage), don't block the UI forever
         setSession(null);
         setUser(null);
         setUserRole(null);
+        setIsRoleLoading(false);
       } finally {
         setIsLoading(false);
       }
@@ -176,6 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!user,
     isAdmin: userRole === 'admin',
     isLoading,
+    isRoleLoading,
     userRole,
     login,
     signup,
