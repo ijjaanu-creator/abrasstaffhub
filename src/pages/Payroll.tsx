@@ -205,11 +205,11 @@ export default function Payroll() {
               <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                 <div>
                   <p className="text-muted-foreground text-xs">Base Salary</p>
-                  <p className="font-medium">AED {record.base_salary?.toLocaleString()}</p>
+                  <p className="font-medium">₹{record.base_salary?.toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground text-xs">Net Salary</p>
-                  <p className="font-medium text-primary">AED {record.net_salary?.toLocaleString()}</p>
+                  <p className="font-medium text-primary">₹{record.net_salary?.toLocaleString()}</p>
                 </div>
               </div>
 
@@ -289,31 +289,31 @@ export default function Payroll() {
                       {record.month} {record.year}
                     </td>
                     <td className="px-6 py-4 text-sm text-right text-foreground">
-                      AED {record.base_salary?.toLocaleString()}
+                      ₹{record.base_salary?.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 text-sm text-right">
                       {record.overtime > 0 ? (
-                        <span className="text-success">+AED {record.overtime?.toLocaleString()}</span>
+                        <span className="text-success">+₹{record.overtime?.toLocaleString()}</span>
                       ) : (
                         '-'
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-right">
                       {record.deductions > 0 ? (
-                        <span className="text-destructive">-AED {record.deductions?.toLocaleString()}</span>
+                        <span className="text-destructive">-₹{record.deductions?.toLocaleString()}</span>
                       ) : (
                         '-'
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-right">
                       {record.bonus > 0 ? (
-                        <span className="text-success">+AED {record.bonus?.toLocaleString()}</span>
+                        <span className="text-success">+₹{record.bonus?.toLocaleString()}</span>
                       ) : (
                         '-'
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-right font-semibold text-foreground">
-                      AED {record.net_salary?.toLocaleString()}
+                      ₹{record.net_salary?.toLocaleString()}
                     </td>
                     <td className="px-6 py-4">
                       <div

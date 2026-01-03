@@ -25,7 +25,7 @@ export function PayrollSummary() {
         <div className="flex items-center gap-2 rounded-lg bg-warning/10 px-3 py-1.5">
           <DollarSign className="h-4 w-4 text-warning" />
           <span className="text-sm font-semibold text-warning">
-            AED {totalPending.toLocaleString()} pending
+            ₹{totalPending.toLocaleString()} pending
           </span>
         </div>
       </div>
@@ -58,7 +58,7 @@ export function PayrollSummary() {
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <p className="text-sm font-semibold text-foreground">
-                    AED {record.netSalary.toLocaleString()}
+                    ₹{record.netSalary.toLocaleString()}
                   </p>
                   {record.overtime > 0 && (
                     <p className="text-xs text-success">+{record.overtime} OT</p>

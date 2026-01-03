@@ -94,7 +94,7 @@ export default function AdminDashboard() {
         />
         <StatsCard
           title="Total Payroll"
-          value={`AED ${((stats?.totalPayrollAmount || 0) / 1000).toFixed(1)}K`}
+          value={`₹${((stats?.totalPayrollAmount || 0) / 1000).toFixed(1)}K`}
           icon={DollarSign}
           variant="primary"
           className="animate-fade-in delay-500"
