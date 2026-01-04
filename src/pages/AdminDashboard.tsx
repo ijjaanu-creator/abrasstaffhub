@@ -3,7 +3,6 @@ import { StatsCard } from '@/components/dashboard/StatsCard';
 import { AttendanceOverview } from '@/components/dashboard/AttendanceOverview';
 import { PayrollSummary } from '@/components/dashboard/PayrollSummary';
 import { FaceReregistrationRequests } from '@/components/dashboard/FaceReregistrationRequests';
-import { ExecutiveLocations } from '@/components/dashboard/ExecutiveLocations';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Users, UserCheck, UserX, Clock, Wallet, IndianRupee } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -111,12 +110,6 @@ export default function AdminDashboard() {
         </ErrorBoundary>
       </div>
 
-      {/* Executive Live Locations */}
-      <div className="animate-fade-in delay-150">
-        <ErrorBoundary>
-          <ExecutiveLocations />
-        </ErrorBoundary>
-      </div>
 
       {/* Main Content */}
       <div className="grid gap-6 lg:grid-cols-2">
