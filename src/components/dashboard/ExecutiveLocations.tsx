@@ -149,15 +149,16 @@ export function ExecutiveLocations() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Map View (OSM embed - avoids Leaflet runtime issues) */}
+        {/* Map View (Google Maps embed) */}
         <div className="relative h-64 rounded-lg overflow-hidden border bg-muted">
           {hasLocations ? (
             <iframe
               title="Executive live locations map"
-              className="absolute inset-0 h-full w-full"
+              className="absolute inset-0 h-full w-full border-0"
               loading="lazy"
+              allowFullScreen
               referrerPolicy="no-referrer-when-downgrade"
-              src={`https://www.openstreetmap.org/export/embed.html?layer=mapnik&marker=${locations[0].latitude}%2C${locations[0].longitude}&zoom=13`}
+              src={`https://www.google.com/maps?q=${locations[0].latitude},${locations[0].longitude}&z=15&output=embed`}
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center flex-col gap-2 bg-muted">
@@ -173,11 +174,11 @@ export function ExecutiveLocations() {
           <div className="flex items-center justify-end">
             <Button asChild variant="ghost" size="sm" className="gap-2">
               <a
-                href={`https://www.openstreetmap.org/?mlat=${locations[0].latitude}&mlon=${locations[0].longitude}#map=13/${locations[0].latitude}/${locations[0].longitude}`}
+                href={`https://www.google.com/maps/search/?api=1&query=${locations[0].latitude},${locations[0].longitude}`}
                 target="_blank"
                 rel="noreferrer"
               >
-                Open map
+                Open in Google Maps
                 <ExternalLink className="h-4 w-4" />
               </a>
             </Button>
