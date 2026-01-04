@@ -253,10 +253,12 @@ export type Database = {
       }
       staff_members: {
         Row: {
+          address: string | null
           biometric_credential_id: string | null
           biometric_enrolled_at: string | null
           biometric_public_key: string | null
           created_at: string
+          date_of_birth: string | null
           department: string
           email: string | null
           employee_id: string
@@ -275,10 +277,12 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          address?: string | null
           biometric_credential_id?: string | null
           biometric_enrolled_at?: string | null
           biometric_public_key?: string | null
           created_at?: string
+          date_of_birth?: string | null
           department: string
           email?: string | null
           employee_id: string
@@ -297,10 +301,12 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          address?: string | null
           biometric_credential_id?: string | null
           biometric_enrolled_at?: string | null
           biometric_public_key?: string | null
           created_at?: string
+          date_of_birth?: string | null
           department?: string
           email?: string | null
           employee_id?: string

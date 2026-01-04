@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   User, Mail, Phone, Building2, Calendar, Briefcase, 
   MapPin, Loader2, CheckCircle2, XCircle, ArrowLeft,
-  Navigation, Clock, Shield
+  Navigation, Clock, Shield, Cake, Home
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -210,6 +210,20 @@ export default function StaffVerify() {
                 label="Shift" 
                 value={`${staffMember.shift_start?.slice(0, 5) || '09:00'} - ${staffMember.shift_end?.slice(0, 5) || '17:00'}`} 
               />
+              {staffMember.date_of_birth && (
+                <DetailItem 
+                  icon={Cake} 
+                  label="Date of Birth" 
+                  value={format(new Date(staffMember.date_of_birth), 'MMM d, yyyy')} 
+                />
+              )}
+              {staffMember.address && (
+                <DetailItem 
+                  icon={Home} 
+                  label="Address" 
+                  value={staffMember.address} 
+                />
+              )}
             </div>
           </div>
         </div>
