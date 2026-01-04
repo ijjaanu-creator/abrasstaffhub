@@ -21,7 +21,8 @@ export default function Profile() {
   const [isFlipped, setIsFlipped] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const idCardRef = useRef<HTMLDivElement>(null);
+  const idCardFrontRef = useRef<HTMLDivElement>(null);
+  const idCardBackRef = useRef<HTMLDivElement>(null);
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['my-profile', user?.id],
@@ -118,23 +119,42 @@ export default function Profile() {
   };
 
   const handleDownloadIdCard = async () => {
-    if (!idCardRef.current) return;
+    if (!idCardFrontRef.current || !idCardBackRef.current) return;
     
     setIsDownloading(true);
     try {
-      const canvas = await html2canvas(idCardRef.current, {
+      // Capture front side
+      const frontCanvas = await html2canvas(idCardFrontRef.current, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: null,
       });
       
-      const link = document.createElement('a');
-      link.download = `${staffMember?.employee_id || 'staff'}-id-card.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      // Capture back side
+      const backCanvas = await html2canvas(idCardBackRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+      });
       
-      toast({ title: 'ID card downloaded successfully' });
+      // Download front
+      const frontLink = document.createElement('a');
+      frontLink.download = `${staffMember?.employee_id || 'staff'}-id-card-front.png`;
+      frontLink.href = frontCanvas.toDataURL('image/png');
+      frontLink.click();
+      
+      // Small delay before downloading back
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Download back
+      const backLink = document.createElement('a');
+      backLink.download = `${staffMember?.employee_id || 'staff'}-id-card-back.png`;
+      backLink.href = backCanvas.toDataURL('image/png');
+      backLink.click();
+      
+      toast({ title: 'Both sides of ID card downloaded' });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       toast({ title: 'Error downloading ID card', description: errorMessage, variant: 'destructive' });
@@ -197,8 +217,8 @@ export default function Profile() {
             >
               {/* Front of Card */}
               <div 
-                ref={!isFlipped ? idCardRef : undefined}
-                className="absolute inset-0 [backface-visibility:hidden] overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 p-0.5 sm:p-1 shadow-xl"
+                ref={idCardFrontRef}
+                className={`absolute inset-0 [backface-visibility:hidden] overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 p-0.5 sm:p-1 shadow-xl ${isFlipped ? 'invisible' : ''}`}
               >
                 <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
                 <div className="relative rounded-xl bg-card/95 backdrop-blur p-3 sm:p-6 h-full">
@@ -303,8 +323,8 @@ export default function Profile() {
 
               {/* Back of Card */}
               <div 
-                ref={isFlipped ? idCardRef : undefined}
-                className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 p-0.5 sm:p-1 shadow-xl"
+                ref={idCardBackRef}
+                className={`absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 p-0.5 sm:p-1 shadow-xl ${!isFlipped ? 'invisible' : ''}`}
               >
                 <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
                 <div className="relative rounded-xl bg-card/95 backdrop-blur p-4 sm:p-6 h-full flex flex-col items-center justify-center">
