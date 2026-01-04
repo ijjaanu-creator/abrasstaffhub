@@ -22,6 +22,7 @@ import {
   Navigation,
   Cake,
   Home,
+  Trash2,
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -168,6 +169,23 @@ export default function Staff() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff-members'] });
       toast({ title: 'Staff status updated' });
+    },
+  });
+
+  const deleteStaffMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('staff_members')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff-members'] });
+      toast({ title: 'Staff member removed successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error removing staff', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -596,6 +614,19 @@ export default function Staff() {
                 >
                   {staff.status === 'active' ? 'Deactivate' : 'Activate'}
                 </DropdownMenuItem>
+                {staff.status === 'inactive' && (
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      if (confirm(`Are you sure you want to permanently remove ${staff.name}? This action cannot be undone.`)) {
+                        deleteStaffMutation.mutate(staff.id);
+                      }
+                    }}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Remove Permanently
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
 
