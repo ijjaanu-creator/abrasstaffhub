@@ -270,6 +270,7 @@ export type Database = {
           shift_end: string | null
           shift_start: string | null
           status: string
+          track_location: boolean
           updated_at: string
           user_id: string | null
         }
@@ -291,6 +292,7 @@ export type Database = {
           shift_end?: string | null
           shift_start?: string | null
           status?: string
+          track_location?: boolean
           updated_at?: string
           user_id?: string | null
         }
@@ -312,6 +314,7 @@ export type Database = {
           shift_end?: string | null
           shift_start?: string | null
           status?: string
+          track_location?: boolean
           updated_at?: string
           user_id?: string | null
         }
