@@ -1,9 +1,9 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, RefreshCw, Clock, User } from 'lucide-react';
+import { MapPin, RefreshCw, Clock, User, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -18,10 +18,6 @@ interface ExecutiveLocation {
   staff_position: string;
   check_in: string | null;
 }
-
-// Lazy load map components to avoid SSR/bundling issues
-const MapComponents = lazy(() => import('./ExecutiveLocationsMap'));
-
 export function ExecutiveLocations() {
 
   // Fetch current locations for Executive staff who are checked in
@@ -153,18 +149,16 @@ export function ExecutiveLocations() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Map View */}
-        <div className="relative h-64 rounded-lg overflow-hidden border">
+        {/* Map View (OSM embed - avoids Leaflet runtime issues) */}
+        <div className="relative h-64 rounded-lg overflow-hidden border bg-muted">
           {hasLocations ? (
-            <Suspense
-              fallback={
-                <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                  <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              }
-            >
-              <MapComponents locations={locations} />
-            </Suspense>
+            <iframe
+              title="Executive live locations map"
+              className="absolute inset-0 h-full w-full"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              src={`https://www.openstreetmap.org/export/embed.html?layer=mapnik&marker=${locations[0].latitude}%2C${locations[0].longitude}&zoom=13`}
+            />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center flex-col gap-2 bg-muted">
               <MapPin className="h-8 w-8 text-muted-foreground" />
@@ -174,6 +168,21 @@ export function ExecutiveLocations() {
             </div>
           )}
         </div>
+
+        {hasLocations ? (
+          <div className="flex items-center justify-end">
+            <Button asChild variant="ghost" size="sm" className="gap-2">
+              <a
+                href={`https://www.openstreetmap.org/?mlat=${locations[0].latitude}&mlon=${locations[0].longitude}#map=13/${locations[0].latitude}/${locations[0].longitude}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open map
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </Button>
+          </div>
+        ) : null}
         {hasLocations ? (
           <div className="space-y-3">
             <h4 className="font-medium text-sm text-muted-foreground">Currently Tracked</h4>
