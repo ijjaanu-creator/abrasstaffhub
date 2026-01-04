@@ -101,7 +101,7 @@ export function ExecutiveLocations() {
         } as ExecutiveLocation;
       });
     },
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 5000, // Refetch every 5 seconds
   });
 
   // Set up realtime subscription

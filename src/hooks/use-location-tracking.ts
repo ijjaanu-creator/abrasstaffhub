@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-const TRACKING_INTERVAL_MS = 30000; // 30 seconds
+const TRACKING_INTERVAL_MS = 5000; // 5 seconds
 
 interface LocationTrackingOptions {
   staffId: string;
