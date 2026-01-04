@@ -18,7 +18,10 @@ import {
   Loader2,
   X,
   Clock,
+  MapPin,
+  Navigation,
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,7 +61,11 @@ export default function Staff() {
     employee_id: '',
     shift_start: '09:00',
     shift_end: '17:00',
+    track_location: false,
   });
+
+  // Location dialog state
+  const [selectedStaffForLocation, setSelectedStaffForLocation] = useState<any>(null);
 
   const { data: staffMembers = [], isLoading } = useQuery({
     queryKey: ['staff-members'],
@@ -97,6 +104,7 @@ export default function Staff() {
         employee_id: staffData.employee_id,
         shift_start: staffData.shift_start,
         shift_end: staffData.shift_end,
+        track_location: staffData.track_location,
       });
       if (error) throw error;
     },
@@ -125,6 +133,7 @@ export default function Staff() {
           employee_id: staffData.employee_id,
           shift_start: staffData.shift_start,
           shift_end: staffData.shift_end,
+          track_location: staffData.track_location,
         })
         .eq('id', id);
       if (error) throw error;
@@ -165,6 +174,7 @@ export default function Staff() {
       employee_id: '',
       shift_start: '09:00',
       shift_end: '17:00',
+      track_location: false,
     });
   };
 
@@ -179,9 +189,29 @@ export default function Staff() {
       employee_id: staff.employee_id,
       shift_start: staff.shift_start?.slice(0, 5) || '09:00',
       shift_end: staff.shift_end?.slice(0, 5) || '17:00',
+      track_location: staff.track_location || false,
     });
     setEditingStaff(staff);
   };
+
+  // Fetch latest location for selected staff
+  const { data: staffLocation } = useQuery({
+    queryKey: ['staff-location', selectedStaffForLocation?.id],
+    queryFn: async () => {
+      if (!selectedStaffForLocation?.id) return null;
+      const { data, error } = await supabase
+        .from('executive_locations')
+        .select('*')
+        .eq('staff_id', selectedStaffForLocation.id)
+        .order('recorded_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedStaffForLocation?.id,
+    refetchInterval: 10000, // Refresh every 10 seconds
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -332,6 +362,21 @@ export default function Staff() {
         </div>
       </div>
 
+      {/* Location Tracking Toggle */}
+      <div className="flex items-center justify-between rounded-lg border border-border p-4">
+        <div className="space-y-0.5">
+          <Label htmlFor="track_location" className="text-base font-medium">Track Location</Label>
+          <p className="text-sm text-muted-foreground">
+            Enable live GPS tracking when this staff checks in
+          </p>
+        </div>
+        <Switch
+          id="track_location"
+          checked={formData.track_location}
+          onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, track_location: checked }))}
+        />
+      </div>
+
       <div className="flex justify-end gap-3 pt-4">
         <Button
           type="button"
@@ -411,24 +456,87 @@ export default function Staff() {
         </div>
       </div>
 
+      {/* Location Tracking Dialog */}
+      <Dialog open={!!selectedStaffForLocation} onOpenChange={(open) => !open && setSelectedStaffForLocation(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Navigation className="h-5 w-5 text-primary" />
+              Live Location - {selectedStaffForLocation?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {staffLocation ? (
+              <>
+                <div className="relative h-64 rounded-lg overflow-hidden border bg-muted">
+                  <iframe
+                    title="Staff location map"
+                    className="absolute inset-0 h-full w-full border-0"
+                    loading="lazy"
+                    allowFullScreen
+                    referrerPolicy="no-referrer-when-downgrade"
+                    src={`https://www.google.com/maps?q=${staffLocation.latitude},${staffLocation.longitude}&z=15&output=embed`}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Last updated: {new Date(staffLocation.recorded_at).toLocaleString()}
+                  </span>
+                  <Button asChild variant="outline" size="sm" className="gap-2">
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${staffLocation.latitude},${staffLocation.longitude}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <MapPin className="h-4 w-4" />
+                      Open in Maps
+                    </a>
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <MapPin className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <p className="text-muted-foreground">No location data available yet.</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Location will appear when staff checks in.
+                </p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Staff Grid */}
       <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {filteredStaff.map((staff: any, index: number) => (
           <div
             key={staff.id}
-            className="group relative rounded-xl border border-border bg-card p-4 lg:p-6 shadow-elegant transition-all duration-300 hover:shadow-lg hover:border-primary/20 animate-fade-in"
+            className={cn(
+              "group relative rounded-xl border border-border bg-card p-4 lg:p-6 shadow-elegant transition-all duration-300 hover:shadow-lg hover:border-primary/20 animate-fade-in",
+              staff.track_location && "cursor-pointer"
+            )}
             style={{ animationDelay: `${(index + 2) * 50}ms` }}
+            onClick={() => staff.track_location && setSelectedStaffForLocation(staff)}
           >
-            {/* Status Badge */}
-            <div
-              className={cn(
-                'absolute right-3 top-3 lg:right-4 lg:top-4 rounded-full px-2 py-0.5 text-xs font-medium',
-                staff.status === 'active'
-                  ? 'bg-success/10 text-success'
-                  : 'bg-muted text-muted-foreground'
+            {/* Status Badge & Tracking Badge */}
+            <div className="absolute right-3 top-3 lg:right-4 lg:top-4 flex items-center gap-2">
+              {staff.track_location && (
+                <div className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  GPS
+                </div>
               )}
-            >
-              {staff.status}
+              <div
+                className={cn(
+                  'rounded-full px-2 py-0.5 text-xs font-medium',
+                  staff.status === 'active'
+                    ? 'bg-success/10 text-success'
+                    : 'bg-muted text-muted-foreground'
+                )}
+              >
+                {staff.status}
+              </div>
             </div>
 
             {/* Actions */}
