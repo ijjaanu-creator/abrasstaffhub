@@ -168,14 +168,10 @@ export default function Profile() {
     setTouchStart(null);
   };
 
-  const qrData = staffMember ? JSON.stringify({
-    id: staffMember.employee_id,
-    name: staffMember.name,
-    position: staffMember.position,
-    department: staffMember.department,
-    phone: staffMember.phone,
-    email: staffMember.email || profile?.email,
-  }) : '';
+  // QR code now contains a URL to the verification page
+  const qrData = staffMember 
+    ? `${window.location.origin}/verify?id=${staffMember.employee_id}`
+    : '';
 
   if (profileLoading) {
     return <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;

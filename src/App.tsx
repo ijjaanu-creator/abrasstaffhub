@@ -18,6 +18,7 @@ import MarkAttendance from "./pages/MarkAttendance";
 import MyAttendance from "./pages/MyAttendance";
 import MySalary from "./pages/MySalary";
 import Profile from "./pages/Profile";
+import StaffVerify from "./pages/StaffVerify";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/verify" element={<StaffVerify />} />
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/staff" element={<Staff />} />
