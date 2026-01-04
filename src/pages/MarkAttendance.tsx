@@ -170,10 +170,12 @@ export default function MarkAttendance() {
       if (!user?.id || !staffMember?.id) return;
       const success = await enrollFace(user.id, staffMember.id, imageBase64);
       if (success) {
-        // If this was a re-registration with approval, delete the approval
+        // If this was a re-registration with approval, delete the approval (one-time use)
         if (approvedRequest) {
           await deleteApprovedRequestMutation.mutateAsync(approvedRequest.id);
-          queryClient.invalidateQueries({ queryKey: ['approved-reregistration'] });
+          // Immediately clear cached approved request so UI doesn't still show "Approved"
+          queryClient.setQueryData(['approved-reregistration', staffMember.id], null);
+          queryClient.invalidateQueries({ queryKey: ['approved-reregistration', staffMember.id] });
         }
         queryClient.invalidateQueries({ queryKey: ['my-staff-record'] });
         setShowFaceCapture(false);
