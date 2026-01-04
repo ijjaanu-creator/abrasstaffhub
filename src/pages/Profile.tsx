@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { User, Mail, Phone, Building2, Calendar, Loader2, Save, Camera, BadgeCheck, Download } from 'lucide-react';
+import { User, Mail, Phone, Building2, Calendar, Loader2, Save, Camera, BadgeCheck, Download, RotateCcw } from 'lucide-react';
 import html2canvas from 'html2canvas';
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function Profile() {
   const { user } = useAuth();
@@ -17,6 +18,8 @@ export default function Profile() {
   const [formData, setFormData] = useState({ name: '', phone: '' });
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const idCardRef = useRef<HTMLDivElement>(null);
 
@@ -145,6 +148,35 @@ export default function Profile() {
     updateProfileMutation.mutate(formData);
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStart === null) return;
+    const touchEnd = e.changedTouches[0].clientX;
+    const diff = touchStart - touchEnd;
+    
+    // Swipe left to flip to back, swipe right to flip to front
+    if (Math.abs(diff) > 50) {
+      if (diff > 0 && !isFlipped) {
+        setIsFlipped(true);
+      } else if (diff < 0 && isFlipped) {
+        setIsFlipped(false);
+      }
+    }
+    setTouchStart(null);
+  };
+
+  const qrData = staffMember ? JSON.stringify({
+    id: staffMember.employee_id,
+    name: staffMember.name,
+    position: staffMember.position,
+    department: staffMember.department,
+    phone: staffMember.phone,
+    email: staffMember.email || profile?.email,
+  }) : '';
+
   if (profileLoading) {
     return <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
@@ -156,115 +188,166 @@ export default function Profile() {
         <p className="mt-1 text-sm text-muted-foreground">View and update your profile information</p>
       </div>
 
-      {/* Staff ID Card */}
+      {/* Staff ID Card with Flip */}
       {staffMember && (
         <div className="space-y-3">
-          <div ref={idCardRef} className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 p-1 shadow-xl">
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
-            <div className="relative rounded-xl bg-card/95 backdrop-blur p-6">
-              <div className="flex items-start justify-between mb-6">
-                <div className="flex items-center gap-2">
-                  <BadgeCheck className="h-6 w-6 text-primary" />
-                  <span className="font-display font-bold text-lg text-primary">STAFF ID CARD</span>
+          <div 
+            className="relative [perspective:1000px] h-[280px]"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            <div 
+              className={`relative w-full h-full transition-transform duration-500 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}
+            >
+              {/* Front of Card */}
+              <div 
+                ref={!isFlipped ? idCardRef : undefined}
+                className="absolute inset-0 [backface-visibility:hidden] overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 p-1 shadow-xl"
+              >
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
+                <div className="relative rounded-xl bg-card/95 backdrop-blur p-6 h-full">
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="flex items-center gap-2">
+                      <BadgeCheck className="h-6 w-6 text-primary" />
+                      <span className="font-display font-bold text-lg text-primary">STAFF ID CARD</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">ID: {staffMember.employee_id}</span>
+                  </div>
+
+                  <div className="flex gap-6">
+                    {/* Avatar Section */}
+                    <div className="flex-shrink-0">
+                      <div className="relative group">
+                        <div className="h-28 w-28 rounded-xl overflow-hidden border-2 border-primary/20 bg-muted">
+                          {profile?.avatar_url ? (
+                            <img 
+                              src={profile.avatar_url} 
+                              alt="Avatar" 
+                              className="h-full w-full object-cover"
+                              crossOrigin="anonymous"
+                            />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/10">
+                              <span className="font-display text-3xl font-bold text-primary">
+                                {profile?.name?.charAt(0) || staffMember.name?.charAt(0) || 'U'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isUploadingAvatar}
+                          className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl cursor-pointer"
+                        >
+                          {isUploadingAvatar ? (
+                            <Loader2 className="h-6 w-6 animate-spin text-white" />
+                          ) : (
+                            <Camera className="h-6 w-6 text-white" />
+                          )}
+                        </button>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleAvatarUpload}
+                          className="hidden"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Info Section */}
+                    <div className="flex-1 space-y-3">
+                      <div>
+                        <h2 className="font-display text-xl font-bold text-foreground">{staffMember.name}</h2>
+                        <p className="text-sm text-primary font-medium">{staffMember.position}</p>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Building2 className="h-4 w-4" />
+                          <span>{staffMember.department}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Phone className="h-4 w-4" />
+                          <span>{staffMember.phone}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Mail className="h-4 w-4" />
+                          <span className="truncate">{staffMember.email || profile?.email}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          <span>Since {new Date(staffMember.join_date).getFullYear()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`h-2 w-2 rounded-full ${staffMember.status === 'active' ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                      <span className="text-xs text-muted-foreground capitalize">{staffMember.status}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">Swipe left for QR →</span>
+                  </div>
                 </div>
-                <span className="text-xs text-muted-foreground">ID: {staffMember.employee_id}</span>
               </div>
 
-              <div className="flex gap-6">
-                {/* Avatar Section */}
-                <div className="flex-shrink-0">
-                  <div className="relative group">
-                    <div className="h-28 w-28 rounded-xl overflow-hidden border-2 border-primary/20 bg-muted">
-                      {profile?.avatar_url ? (
-                        <img 
-                          src={profile.avatar_url} 
-                          alt="Avatar" 
-                          className="h-full w-full object-cover"
-                          crossOrigin="anonymous"
-                        />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/10">
-                          <span className="font-display text-3xl font-bold text-primary">
-                            {profile?.name?.charAt(0) || staffMember.name?.charAt(0) || 'U'}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploadingAvatar}
-                      className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl cursor-pointer"
-                    >
-                      {isUploadingAvatar ? (
-                        <Loader2 className="h-6 w-6 animate-spin text-white" />
-                      ) : (
-                        <Camera className="h-6 w-6 text-white" />
-                      )}
-                    </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarUpload}
-                      className="hidden"
-                    />
-                  </div>
-                  <p className="text-xs text-center text-muted-foreground mt-2">Click to change</p>
-                </div>
-
-                {/* Info Section */}
-                <div className="flex-1 space-y-3">
-                  <div>
-                    <h2 className="font-display text-xl font-bold text-foreground">{staffMember.name}</h2>
-                    <p className="text-sm text-primary font-medium">{staffMember.position}</p>
+              {/* Back of Card */}
+              <div 
+                ref={isFlipped ? idCardRef : undefined}
+                className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 p-1 shadow-xl"
+              >
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
+                <div className="relative rounded-xl bg-card/95 backdrop-blur p-6 h-full flex flex-col items-center justify-center">
+                  <div className="flex items-center gap-2 mb-4">
+                    <BadgeCheck className="h-5 w-5 text-primary" />
+                    <span className="font-display font-bold text-primary">SCAN TO VERIFY</span>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Building2 className="h-4 w-4" />
-                      <span>{staffMember.department}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Phone className="h-4 w-4" />
-                      <span>{staffMember.phone}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Mail className="h-4 w-4" />
-                      <span className="truncate">{staffMember.email || profile?.email}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      <span>Since {new Date(staffMember.join_date).getFullYear()}</span>
-                    </div>
+                  <div className="bg-white p-4 rounded-xl shadow-inner">
+                    <QRCodeSVG 
+                      value={qrData} 
+                      size={140}
+                      level="H"
+                      includeMargin={false}
+                    />
                   </div>
-                </div>
-              </div>
+                  
+                  <div className="mt-4 text-center">
+                    <p className="font-display font-bold text-foreground">{staffMember.name}</p>
+                    <p className="text-xs text-muted-foreground">{staffMember.employee_id}</p>
+                  </div>
 
-              <div className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className={`h-2 w-2 rounded-full ${staffMember.status === 'active' ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                  <span className="text-xs text-muted-foreground capitalize">{staffMember.status}</span>
+                  <span className="text-xs text-muted-foreground mt-4">← Swipe right for details</span>
                 </div>
-                <span className="text-xs text-muted-foreground">
-                  Shift: {staffMember.shift_start?.slice(0, 5)} - {staffMember.shift_end?.slice(0, 5)}
-                </span>
               </div>
             </div>
           </div>
-          
-          <Button 
-            variant="outline" 
-            onClick={handleDownloadIdCard}
-            disabled={isDownloading}
-            className="w-full"
-          >
-            {isDownloading ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4 mr-2" />
-            )}
-            Download ID Card
-          </Button>
+
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsFlipped(!isFlipped)}
+              className="flex-1"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Flip Card
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleDownloadIdCard}
+              disabled={isDownloading}
+              className="flex-1"
+            >
+              {isDownloading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Download
+            </Button>
+          </div>
         </div>
       )}
 
