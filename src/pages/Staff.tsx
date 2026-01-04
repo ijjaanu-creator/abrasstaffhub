@@ -20,6 +20,8 @@ import {
   Clock,
   MapPin,
   Navigation,
+  Cake,
+  Home,
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -62,6 +64,8 @@ export default function Staff() {
     shift_start: '09:00',
     shift_end: '17:00',
     track_location: false,
+    date_of_birth: '',
+    address: '',
   });
 
   // Location dialog state
@@ -105,6 +109,8 @@ export default function Staff() {
         shift_start: staffData.shift_start,
         shift_end: staffData.shift_end,
         track_location: staffData.track_location,
+        date_of_birth: staffData.date_of_birth || null,
+        address: staffData.address || null,
       });
       if (error) throw error;
     },
@@ -134,6 +140,8 @@ export default function Staff() {
           shift_start: staffData.shift_start,
           shift_end: staffData.shift_end,
           track_location: staffData.track_location,
+          date_of_birth: staffData.date_of_birth || null,
+          address: staffData.address || null,
         })
         .eq('id', id);
       if (error) throw error;
@@ -175,6 +183,8 @@ export default function Staff() {
       shift_start: '09:00',
       shift_end: '17:00',
       track_location: false,
+      date_of_birth: '',
+      address: '',
     });
   };
 
@@ -190,6 +200,8 @@ export default function Staff() {
       shift_start: staff.shift_start?.slice(0, 5) || '09:00',
       shift_end: staff.shift_end?.slice(0, 5) || '17:00',
       track_location: staff.track_location || false,
+      date_of_birth: staff.date_of_birth || '',
+      address: staff.address || '',
     });
     setEditingStaff(staff);
   };
@@ -335,6 +347,30 @@ export default function Staff() {
           required
           autoComplete="off"
         />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="date_of_birth">Date of Birth</Label>
+          <Input
+            id="date_of_birth"
+            name="date_of_birth"
+            type="date"
+            value={formData.date_of_birth}
+            onChange={(e) => setFormData((prev) => ({ ...prev, date_of_birth: e.target.value }))}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="address">Address</Label>
+          <Input
+            id="address"
+            name="address"
+            value={formData.address}
+            onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
+            placeholder="Enter address"
+            autoComplete="off"
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
