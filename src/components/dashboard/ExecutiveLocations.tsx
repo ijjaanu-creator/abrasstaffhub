@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,9 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { MapPin, RefreshCw, Clock, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 
 interface ExecutiveLocation {
   id: string;
@@ -22,15 +19,8 @@ interface ExecutiveLocation {
   check_in: string | null;
 }
 
-// Custom marker icon
-const createCustomIcon = () => {
-  return L.divIcon({
-    className: 'custom-marker',
-    html: `<div style="background-color: hsl(var(--primary)); width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-  });
-};
+// Lazy load map components to avoid SSR/bundling issues
+const MapComponents = lazy(() => import('./ExecutiveLocationsMap'));
 
 export function ExecutiveLocations() {
 
@@ -166,33 +156,15 @@ export function ExecutiveLocations() {
         {/* Map View */}
         <div className="relative h-64 rounded-lg overflow-hidden border">
           {hasLocations ? (
-            <MapContainer
-              center={[locations[0].latitude, locations[0].longitude]}
-              zoom={13}
-              style={{ height: '100%', width: '100%' }}
+            <Suspense
+              fallback={
+                <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                  <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              }
             >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              {locations.map((loc) => (
-                <Marker
-                  key={loc.id}
-                  position={[loc.latitude, loc.longitude]}
-                  icon={createCustomIcon()}
-                >
-                  <Popup>
-                    <div className="text-sm">
-                      <p className="font-semibold">{loc.staff_name}</p>
-                      <p className="text-muted-foreground">{loc.staff_position}</p>
-                      <p className="text-xs mt-1">
-                        Updated {formatDistanceToNow(new Date(loc.recorded_at), { addSuffix: true })}
-                      </p>
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
-            </MapContainer>
+              <MapComponents locations={locations} />
+            </Suspense>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center flex-col gap-2 bg-muted">
               <MapPin className="h-8 w-8 text-muted-foreground" />
