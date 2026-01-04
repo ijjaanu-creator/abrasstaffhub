@@ -466,31 +466,6 @@ export default function Profile() {
         </div>
       )}
 
-            <Button 
-              variant="outline" 
-              onClick={() => setIsFlipped(!isFlipped)}
-              className="flex-1"
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Flip Card
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleDownloadIdCard}
-              disabled={isDownloading}
-              className="flex-1"
-            >
-              {isDownloading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" />
-              )}
-              Download
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* Profile Edit Card */}
       <div className="rounded-xl border bg-card p-6">
         <h3 className="font-semibold mb-4">Account Information</h3>
