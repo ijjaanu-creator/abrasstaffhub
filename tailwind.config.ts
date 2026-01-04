@@ -112,6 +112,9 @@ export default {
         'elegant': '0 10px 15px -3px hsl(25 25% 15% / 0.08), 0 4px 6px -4px hsl(25 25% 15% / 0.05)',
         'glow': '0 0 20px hsl(28 85% 45% / 0.3)',
       },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(ellipse at center, var(--tw-gradient-stops))',
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],

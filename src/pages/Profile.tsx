@@ -283,10 +283,19 @@ export default function Profile() {
               {/* Front of Card */}
               <div
                 ref={idCardFrontRef}
-                className={`absolute inset-0 [backface-visibility:hidden] overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 p-0.5 sm:p-1 shadow-xl ${isFlipped ? 'invisible' : ''}`}
+                className={`absolute inset-0 [backface-visibility:hidden] overflow-hidden rounded-2xl bg-white p-0 shadow-xl ${isFlipped ? 'invisible' : ''}`}
               >
-                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIj48ZyBmaWxsPSIjZmZmZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDciPjxwYXRoIGQ9Ik0yMCAxNWM0IDAgNyA0IDcgNyAwIDMtMiA2LTUgN2MtMyAyLTYgMS04LTFjLTIgMS00IDItNiAyLTQgMC03LTQtNy03IDAtMyAyLTYgNS03IDMtMiA2LTEgOCAxIDItMSA0LTIgNi0yeiIvPjxwYXRoIGQ9Ik00OCA0MGM0IDAgNyA0IDcgNyAwIDMtMiA2LTUgN2MtMyAyLTYgMS04LTFjLTIgMS00IDItNiAyLTQgMC03LTQtNy03IDAtMyAyLTYgNS03IDMtMiA2LTEgOCAxIDItMSA0LTIgNi0yeiIvPjxwYXRoIGQ9Ik00OCAxNmwzIDMgMy0zIDMgMy0zIDMgMyAzLTMgMy0zLTMtMyAzLTMtMy0zLTN6Ii8+PHBhdGggZD0iTTE4IDU2bDMgMyAzLTMgMyAzLTMgMyAzLTMgMy0zLTMtMyAzLTMtMy0zLTN6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-60" />
-                <div className="relative rounded-xl bg-card/95 backdrop-blur p-3 sm:p-6 h-full">
+                {/* Holi powder splashes */}
+                <div className="absolute -top-8 -left-8 w-32 h-32 rounded-full bg-gradient-radial from-pink-400/60 via-pink-300/30 to-transparent blur-xl" />
+                <div className="absolute -top-4 right-8 w-24 h-24 rounded-full bg-gradient-radial from-yellow-400/50 via-yellow-300/25 to-transparent blur-xl" />
+                <div className="absolute top-16 -right-6 w-28 h-28 rounded-full bg-gradient-radial from-green-400/50 via-green-300/25 to-transparent blur-xl" />
+                <div className="absolute -bottom-6 left-12 w-32 h-32 rounded-full bg-gradient-radial from-blue-400/50 via-blue-300/25 to-transparent blur-xl" />
+                <div className="absolute bottom-8 -right-4 w-24 h-24 rounded-full bg-gradient-radial from-purple-400/50 via-purple-300/25 to-transparent blur-xl" />
+                <div className="absolute top-1/2 left-1/4 w-20 h-20 rounded-full bg-gradient-radial from-orange-400/40 via-orange-300/20 to-transparent blur-xl" />
+                <div className="absolute bottom-1/3 right-1/3 w-16 h-16 rounded-full bg-gradient-radial from-red-400/40 via-red-300/20 to-transparent blur-lg" />
+                <div className="absolute top-1/4 right-1/4 w-14 h-14 rounded-full bg-gradient-radial from-cyan-400/40 via-cyan-300/20 to-transparent blur-lg" />
+                
+                <div className="relative rounded-xl bg-white/90 backdrop-blur p-3 sm:p-6 h-full">
                   <div className="flex items-start justify-between mb-3 sm:mb-5">
                     <div className="flex items-center gap-2">
                       <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-primary/10 ring-1 ring-primary/15 flex items-center justify-center">
@@ -401,10 +410,19 @@ export default function Profile() {
               {/* Back of Card */}
               <div
                 ref={idCardBackRef}
-                className={`absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 p-0.5 sm:p-1 shadow-xl ${!isFlipped ? 'invisible' : ''}`}
+                className={`absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-hidden rounded-2xl bg-white p-0 shadow-xl ${!isFlipped ? 'invisible' : ''}`}
               >
-                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIj48ZyBmaWxsPSIjZmZmZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDciPjxwYXRoIGQ9Ik0yMCAxNWM0IDAgNyA0IDcgNyAwIDMtMiA2LTUgN2MtMyAyLTYgMS04LTFjLTIgMS00IDItNiAyLTQgMC03LTQtNy03IDAtMyAyLTYgNS03IDMtMiA2LTEgOCAxIDItMSA0LTIgNi0yeiIvPjxwYXRoIGQ9Ik00OCA0MGM0IDAgNyA0IDcgNyAwIDMtMiA2LTUgN2MtMyAyLTYgMS04LTFjLTIgMS00IDItNiAyLTQgMC03LTQtNy03IDAtMyAyLTYgNS03IDMtMiA2LTEgOCAxIDItMSA0LTIgNi0yeiIvPjxwYXRoIGQ9Ik00OCAxNmwzIDMgMy0zIDMgMy0zIDMgMyAzLTMgMy0zLTMtMyAzLTMtMy0zLTN6Ii8+PHBhdGggZD0iTTE4IDU2bDMgMyAzLTMgMyAzLTMgMyAzLTMgMy0zLTMtMyAzLTMtMy0zLTN6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-60" />
-                <div className="relative rounded-xl bg-card/95 backdrop-blur p-4 sm:p-6 h-full flex flex-col items-center justify-center">
+                {/* Holi powder splashes */}
+                <div className="absolute -top-6 right-4 w-28 h-28 rounded-full bg-gradient-radial from-purple-400/60 via-purple-300/30 to-transparent blur-xl" />
+                <div className="absolute -top-4 -left-6 w-24 h-24 rounded-full bg-gradient-radial from-orange-400/50 via-orange-300/25 to-transparent blur-xl" />
+                <div className="absolute top-1/3 -right-8 w-32 h-32 rounded-full bg-gradient-radial from-pink-400/50 via-pink-300/25 to-transparent blur-xl" />
+                <div className="absolute -bottom-8 right-8 w-28 h-28 rounded-full bg-gradient-radial from-yellow-400/50 via-yellow-300/25 to-transparent blur-xl" />
+                <div className="absolute bottom-1/4 -left-4 w-24 h-24 rounded-full bg-gradient-radial from-green-400/50 via-green-300/25 to-transparent blur-xl" />
+                <div className="absolute top-1/2 right-1/4 w-16 h-16 rounded-full bg-gradient-radial from-blue-400/40 via-blue-300/20 to-transparent blur-lg" />
+                <div className="absolute bottom-1/2 left-1/3 w-14 h-14 rounded-full bg-gradient-radial from-red-400/40 via-red-300/20 to-transparent blur-lg" />
+                <div className="absolute top-1/4 left-1/4 w-12 h-12 rounded-full bg-gradient-radial from-cyan-400/40 via-cyan-300/20 to-transparent blur-lg" />
+                
+                <div className="relative rounded-xl bg-white/90 backdrop-blur p-4 sm:p-6 h-full flex flex-col items-center justify-center">
                   <div className="absolute top-4 left-4 flex items-center gap-2">
                     <div className="h-8 w-8 rounded-xl bg-primary/10 ring-1 ring-primary/15 flex items-center justify-center">
                       <BrandLogo size={24} className="h-6 w-6" />
