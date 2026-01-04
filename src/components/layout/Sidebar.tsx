@@ -13,6 +13,7 @@ import {
   User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { BrandLogo } from '@/components/BrandLogo';
 
 const adminNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
@@ -55,8 +56,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     <div className="flex h-full flex-col border-r border-border bg-card">
       {/* Logo */}
       <div className="flex h-16 items-center gap-3 border-b border-border px-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-primary">
-          <span className="font-display text-lg font-bold text-primary-foreground">A</span>
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/15">
+          <BrandLogo size={28} className="h-7 w-7" />
         </div>
         <div>
           <h1 className="font-display text-lg font-semibold text-foreground">Abras</h1>
