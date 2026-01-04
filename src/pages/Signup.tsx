@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Phone, Lock, Mail, Loader2, User } from 'lucide-react';
+import { BrandLogo } from '@/components/BrandLogo';
 
 export default function Signup() {
   const [name, setName] = useState('');

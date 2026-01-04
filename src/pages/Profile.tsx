@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { User, Mail, Phone, Building2, Calendar, Loader2, Save, Camera, BadgeCheck, Download, RotateCcw, MapPin, Cake } from 'lucide-react';
+import { User, Mail, Phone, Building2, Calendar, Loader2, Save, Camera, BadgeCheck, Download, RotateCcw, MapPin, Cake, Printer } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { QRCodeSVG } from 'qrcode.react';
+import { BrandLogo } from '@/components/BrandLogo';
 
 export default function Profile() {
   const { user } = useAuth();
@@ -120,7 +121,7 @@ export default function Profile() {
 
   const handleDownloadIdCard = async () => {
     if (!idCardFrontRef.current || !idCardBackRef.current) return;
-    
+
     setIsDownloading(true);
     try {
       // Capture front side
@@ -130,7 +131,7 @@ export default function Profile() {
         allowTaint: true,
         backgroundColor: null,
       });
-      
+
       // Capture back side
       const backCanvas = await html2canvas(idCardBackRef.current, {
         scale: 2,
@@ -138,26 +139,90 @@ export default function Profile() {
         allowTaint: true,
         backgroundColor: null,
       });
-      
+
       // Download front
       const frontLink = document.createElement('a');
       frontLink.download = `${staffMember?.employee_id || 'staff'}-id-card-front.png`;
       frontLink.href = frontCanvas.toDataURL('image/png');
       frontLink.click();
-      
+
       // Small delay before downloading back
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
       // Download back
       const backLink = document.createElement('a');
       backLink.download = `${staffMember?.employee_id || 'staff'}-id-card-back.png`;
       backLink.href = backCanvas.toDataURL('image/png');
       backLink.click();
-      
+
       toast({ title: 'Both sides of ID card downloaded' });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       toast({ title: 'Error downloading ID card', description: errorMessage, variant: 'destructive' });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handlePrintIdCard = async () => {
+    if (!idCardFrontRef.current || !idCardBackRef.current) return;
+
+    setIsDownloading(true);
+    try {
+      const frontCanvas = await html2canvas(idCardFrontRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+      });
+      const backCanvas = await html2canvas(idCardBackRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+      });
+
+      const front = frontCanvas.toDataURL('image/png');
+      const back = backCanvas.toDataURL('image/png');
+
+      const w = window.open('', '_blank');
+      if (!w) throw new Error('Popup blocked');
+
+      w.document.open();
+      w.document.write(`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Print ID Card</title>
+  <style>
+    @page { margin: 12mm; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    .wrap { display:flex; gap:16mm; align-items:flex-start; flex-wrap:wrap; }
+    figure { margin:0; }
+    figcaption { margin: 6mm 0 3mm; font-size: 12px; color: #444; }
+    img { display:block; width: 86mm; height: 54mm; object-fit: cover; border-radius: 4mm; box-shadow: 0 2mm 8mm rgba(0,0,0,.12); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <figure>
+      <figcaption>Front</figcaption>
+      <img src="${front}" alt="Staff ID card front" />
+    </figure>
+    <figure>
+      <figcaption>Back</figcaption>
+      <img src="${back}" alt="Staff ID card back" />
+    </figure>
+  </div>
+  <script>window.onload = () => { window.focus(); window.print(); };</script>
+</body>
+</html>`);
+      w.document.close();
+
+      toast({ title: 'Print dialog opened' });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast({ title: 'Error printing ID card', description: errorMessage, variant: 'destructive' });
     } finally {
       setIsDownloading(false);
     }
@@ -216,18 +281,30 @@ export default function Profile() {
               className={`relative w-full h-full transition-transform duration-500 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}
             >
               {/* Front of Card */}
-              <div 
+              <div
                 ref={idCardFrontRef}
                 className={`absolute inset-0 [backface-visibility:hidden] overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 p-0.5 sm:p-1 shadow-xl ${isFlipped ? 'invisible' : ''}`}
               >
-                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIj48ZyBmaWxsPSIjZmZmZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDciPjxwYXRoIGQ9Ik0yMCAxNWM0IDAgNyA0IDcgNyAwIDMtMiA2LTUgN2MtMyAyLTYgMS04LTFjLTIgMS00IDItNiAyLTQgMC03LTQtNy03IDAtMyAyLTYgNS03IDMtMiA2LTEgOCAxIDItMSA0LTIgNi0yeiIvPjxwYXRoIGQ9Ik00OCA0MGM0IDAgNyA0IDcgNyAwIDMtMiA2LTUgN2MtMyAyLTYgMS04LTFjLTIgMS00IDItNiAyLTQgMC03LTQtNy03IDAtMyAyLTYgNS03IDMtMiA2LTEgOCAxIDItMSA0LTIgNi0yeiIvPjxwYXRoIGQ9Ik00OCAxNmwzIDMgMy0zIDMgMy0zIDMgMyAzLTMgMy0zLTMtMyAzLTMtMy0zLTN6Ii8+PHBhdGggZD0iTTE4IDU2bDMgMyAzLTMgMyAzLTMgMyAzLTMgMy0zLTMtMyAzLTMtMy0zLTN6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-60" />
                 <div className="relative rounded-xl bg-card/95 backdrop-blur p-3 sm:p-6 h-full">
-                  <div className="flex items-start justify-between mb-3 sm:mb-6">
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      <BadgeCheck className="h-4 w-4 sm:h-6 sm:w-6 text-primary" />
-                      <span className="font-display font-bold text-sm sm:text-lg text-primary">STAFF ID CARD</span>
+                  <div className="flex items-start justify-between mb-3 sm:mb-5">
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-primary/10 ring-1 ring-primary/15 flex items-center justify-center">
+                        <BrandLogo size={28} className="h-7 w-7" />
+                      </div>
+                      <div className="leading-tight">
+                        <p className="font-display font-bold text-sm sm:text-base text-foreground">Abras Natural Spices</p>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground">Staff Identity Card</p>
+                      </div>
                     </div>
-                    <span className="text-[10px] sm:text-xs text-muted-foreground">ID: {staffMember.employee_id}</span>
+
+                    <div className="text-right">
+                      <div className="inline-flex items-center gap-1.5 sm:gap-2">
+                        <BadgeCheck className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                        <span className="font-display font-bold text-sm sm:text-base text-primary">VALID</span>
+                      </div>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">ID: {staffMember.employee_id}</p>
+                    </div>
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3 sm:gap-6">
@@ -236,9 +313,9 @@ export default function Profile() {
                       <div className="relative group">
                         <div className="h-20 w-20 sm:h-28 sm:w-28 rounded-xl overflow-hidden border-2 border-primary/20 bg-muted">
                           {profile?.avatar_url ? (
-                            <img 
-                              src={profile.avatar_url} 
-                              alt="Avatar" 
+                            <img
+                              src={profile.avatar_url}
+                              alt="Staff photo"
                               className="h-full w-full object-cover"
                               crossOrigin="anonymous"
                             />
@@ -277,7 +354,7 @@ export default function Profile() {
                         <h2 className="font-display text-base sm:text-xl font-bold text-foreground leading-tight">{staffMember.name}</h2>
                         <p className="text-xs sm:text-sm text-primary font-medium">{staffMember.position}</p>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-1.5 sm:gap-3 text-[11px] sm:text-sm">
                         <div className="flex items-center justify-center sm:justify-start gap-1 sm:gap-2 text-muted-foreground">
                           <Building2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
@@ -322,27 +399,37 @@ export default function Profile() {
               </div>
 
               {/* Back of Card */}
-              <div 
+              <div
                 ref={idCardBackRef}
                 className={`absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 p-0.5 sm:p-1 shadow-xl ${!isFlipped ? 'invisible' : ''}`}
               >
-                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIj48ZyBmaWxsPSIjZmZmZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDciPjxwYXRoIGQ9Ik0yMCAxNWM0IDAgNyA0IDcgNyAwIDMtMiA2LTUgN2MtMyAyLTYgMS04LTFjLTIgMS00IDItNiAyLTQgMC03LTQtNy03IDAtMyAyLTYgNS03IDMtMiA2LTEgOCAxIDItMSA0LTIgNi0yeiIvPjxwYXRoIGQ9Ik00OCA0MGM0IDAgNyA0IDcgNyAwIDMtMiA2LTUgN2MtMyAyLTYgMS04LTFjLTIgMS00IDItNiAyLTQgMC03LTQtNy03IDAtMyAyLTYgNS03IDMtMiA2LTEgOCAxIDItMSA0LTIgNi0yeiIvPjxwYXRoIGQ9Ik00OCAxNmwzIDMgMy0zIDMgMy0zIDMgMyAzLTMgMy0zLTMtMyAzLTMtMy0zLTN6Ii8+PHBhdGggZD0iTTE4IDU2bDMgMyAzLTMgMyAzLTMgMyAzLTMgMy0zLTMtMyAzLTMtMy0zLTN6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-60" />
                 <div className="relative rounded-xl bg-card/95 backdrop-blur p-4 sm:p-6 h-full flex flex-col items-center justify-center">
+                  <div className="absolute top-4 left-4 flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-xl bg-primary/10 ring-1 ring-primary/15 flex items-center justify-center">
+                      <BrandLogo size={24} className="h-6 w-6" />
+                    </div>
+                    <div className="hidden sm:block leading-tight">
+                      <p className="font-display font-bold text-sm text-foreground">Abras</p>
+                      <p className="text-[10px] text-muted-foreground">Natural Spices</p>
+                    </div>
+                  </div>
+
                   <div className="flex items-center gap-1.5 sm:gap-2 mb-3 sm:mb-4">
                     <BadgeCheck className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                     <span className="font-display font-bold text-sm sm:text-base text-primary">SCAN TO VERIFY</span>
                   </div>
-                  
+
                   <div className="bg-white p-2 sm:p-4 rounded-xl shadow-inner">
-                    <QRCodeSVG 
-                      value={qrData} 
+                    <QRCodeSVG
+                      value={qrData}
                       size={120}
                       level="H"
                       includeMargin={false}
                       className="w-[100px] h-[100px] sm:w-[140px] sm:h-[140px]"
                     />
                   </div>
-                  
+
                   <div className="mt-3 sm:mt-4 text-center">
                     <p className="font-display font-bold text-sm sm:text-base text-foreground">{staffMember.name}</p>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">{staffMember.employee_id}</p>
@@ -355,6 +442,30 @@ export default function Profile() {
           </div>
 
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsFlipped(!isFlipped)} className="flex-1">
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Flip Card
+            </Button>
+            <Button variant="outline" onClick={handlePrintIdCard} disabled={isDownloading} className="flex-1">
+              {isDownloading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Printer className="h-4 w-4 mr-2" />
+              )}
+              Print
+            </Button>
+            <Button variant="outline" onClick={handleDownloadIdCard} disabled={isDownloading} className="flex-1">
+              {isDownloading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Download
+            </Button>
+          </div>
+        </div>
+      )}
+
             <Button 
               variant="outline" 
               onClick={() => setIsFlipped(!isFlipped)}

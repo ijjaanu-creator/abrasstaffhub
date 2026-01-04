@@ -122,13 +122,14 @@ export default function MarkAttendance() {
     },
   });
 
-  // Delete approved request after using it
+  // Delete approved request after using it (clear ALL approved rows for this staff)
   const deleteApprovedRequestMutation = useMutation({
-    mutationFn: async (requestId: string) => {
+    mutationFn: async (staffId: string) => {
       const { error } = await supabase
         .from('face_reregistration_requests')
         .delete()
-        .eq('id', requestId);
+        .eq('staff_id', staffId)
+        .eq('status', 'approved');
       if (error) throw error;
     },
   });

@@ -5,6 +5,7 @@ import { Sidebar } from './Sidebar';
 import { Menu, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { BrandLogo } from '@/components/BrandLogo';
 
 export function AppLayout() {
   const { isAuthenticated, isLoading } = useAuth();
