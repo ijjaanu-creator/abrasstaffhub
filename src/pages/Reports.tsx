@@ -1,4 +1,4 @@
-// Reports page with category details
+// Reports page with category details and staff attendance history
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,12 +35,22 @@ import {
   FileText,
   BarChart3,
   ChevronRight,
+  Eye,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { StaffAttendanceHistory } from '@/components/reports/StaffAttendanceHistory';
 
 const COLORS = ['hsl(142, 76%, 36%)', 'hsl(0, 84%, 60%)', 'hsl(38, 92%, 50%)', 'hsl(217, 91%, 60%)'];
 
 type CategoryType = 'present' | 'absent' | 'late' | 'overtime' | 'lossTime' | null;
+
+interface SelectedStaff {
+  id: string;
+  name: string;
+  position: string;
+  department: string;
+  employeeId: string;
+}
 
 interface CategoryDetailDialogProps {
   category: CategoryType;
@@ -48,6 +58,7 @@ interface CategoryDetailDialogProps {
   attendanceData: any[];
   selectedMonth: string;
   expectedHoursPerDay: number;
+  onSelectStaff: (staff: SelectedStaff) => void;
 }
 
 function CategoryDetailDialog({ 
@@ -55,7 +66,8 @@ function CategoryDetailDialog({
   onClose, 
   attendanceData, 
   selectedMonth,
-  expectedHoursPerDay 
+  expectedHoursPerDay,
+  onSelectStaff,
 }: CategoryDetailDialogProps) {
   if (!category) return null;
 
@@ -106,6 +118,7 @@ function CategoryDetailDialog({
 
   // Group by staff member for summary
   const staffSummary = new Map<string, { 
+    id: string;
     name: string; 
     position: string; 
     department: string;
@@ -127,6 +140,7 @@ function CategoryDetailDialog({
       existing.dates.push(record.date);
     } else {
       staffSummary.set(staffId, {
+        id: staffId,
         name: record.staff_members?.name || 'Unknown',
         position: record.staff_members?.position || '',
         department: record.staff_members?.department || '',
@@ -176,11 +190,26 @@ function CategoryDetailDialog({
               </TableHeader>
               <TableBody>
                 {summaryArray.map((staff, index) => (
-                  <TableRow key={index}>
+                  <TableRow 
+                    key={index} 
+                    className="cursor-pointer hover:bg-muted"
+                    onClick={() => {
+                      onSelectStaff({
+                        id: staff.id,
+                        name: staff.name,
+                        position: staff.position,
+                        department: staff.department,
+                        employeeId: staff.employeeId,
+                      });
+                    }}
+                  >
                     <TableCell>
-                      <div>
-                        <p className="font-medium">{staff.name}</p>
-                        <p className="text-xs text-muted-foreground">{staff.employeeId} • {staff.position}</p>
+                      <div className="flex items-center gap-2">
+                        <div>
+                          <p className="font-medium">{staff.name}</p>
+                          <p className="text-xs text-muted-foreground">{staff.employeeId} • {staff.position}</p>
+                        </div>
+                        <Eye className="h-4 w-4 text-muted-foreground ml-auto" />
                       </div>
                     </TableCell>
                     <TableCell>{staff.department}</TableCell>
@@ -212,6 +241,7 @@ function CategoryDetailDialog({
 export default function Reports() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>(null);
+  const [selectedStaff, setSelectedStaff] = useState<SelectedStaff | null>(null);
   const { toast } = useToast();
 
   // Fetch attendance for the selected month
@@ -630,7 +660,25 @@ export default function Reports() {
             attendanceData={attendanceData}
             selectedMonth={selectedMonth}
             expectedHoursPerDay={expectedHoursPerDay}
+            onSelectStaff={(staff) => {
+              setSelectedStaff(staff);
+            }}
           />
+
+          {/* Staff Attendance History Dialog */}
+          {selectedStaff && (
+            <StaffAttendanceHistory
+              open={!!selectedStaff}
+              onClose={() => setSelectedStaff(null)}
+              staffId={selectedStaff.id}
+              staffName={selectedStaff.name}
+              staffPosition={selectedStaff.position}
+              staffDepartment={selectedStaff.department}
+              staffEmployeeId={selectedStaff.employeeId}
+              attendanceRecords={attendanceData}
+              expectedHoursPerDay={expectedHoursPerDay}
+            />
+          )}
         </div>
 
         {/* Payroll Stats */}
