@@ -461,8 +461,8 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Data Reset */}
-        <DataResetSection />
+        {/* Data Reset - Hidden for safety */}
+        {/* <DataResetSection /> */}
       </div>
     </div>
   );
