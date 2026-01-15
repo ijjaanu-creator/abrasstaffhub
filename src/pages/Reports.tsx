@@ -87,6 +87,30 @@ export default function Reports() {
     },
   });
 
+  // Calculate expected working days in the month
+  const getDaysInMonth = (monthStr: string) => {
+    const [year, month] = monthStr.split('-').map(Number);
+    return new Date(year, month, 0).getDate();
+  };
+
+  const getWorkingDays = (monthStr: string) => {
+    const [year, month] = monthStr.split('-').map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    let workingDays = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month - 1, day);
+      const dayOfWeek = date.getDay();
+      if (dayOfWeek !== 0) { // Exclude Sundays
+        workingDays++;
+      }
+    }
+    return workingDays;
+  };
+
+  const workingDaysInMonth = getWorkingDays(selectedMonth);
+  const expectedHoursPerDay = 8; // Standard 8 hours
+  const expectedTotalHours = workingDaysInMonth * expectedHoursPerDay * staffCount;
+
   // Calculate attendance stats
   const attendanceStats = {
     total: attendanceData.length,
@@ -96,6 +120,10 @@ export default function Reports() {
     totalHours: attendanceData.reduce((sum: number, a: any) => sum + Number(a.work_hours || 0), 0),
     totalOvertime: attendanceData.reduce((sum: number, a: any) => sum + Number(a.overtime || 0), 0),
   };
+
+  // Calculate loss time (expected hours - actual hours worked, excluding overtime)
+  const actualRegularHours = attendanceStats.totalHours - attendanceStats.totalOvertime;
+  const lossTime = Math.max(0, expectedTotalHours - actualRegularHours);
 
   // Calculate payroll stats
   const payrollStats = {
@@ -326,34 +354,55 @@ export default function Reports() {
               Export
             </Button>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <CheckCircle2 className="h-5 w-5 text-success" />
-                <span className="text-foreground">Present</span>
+                <span className="text-foreground">Present Days</span>
               </div>
               <span className="font-semibold text-foreground">{attendanceStats.present}</span>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <XCircle className="h-5 w-5 text-destructive" />
-                <span className="text-foreground">Absent</span>
+                <span className="text-foreground">Absent Days</span>
               </div>
               <span className="font-semibold text-foreground">{attendanceStats.absent}</span>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <AlertCircle className="h-5 w-5 text-warning" />
-                <span className="text-foreground">Late</span>
+                <span className="text-foreground">Late Arrivals</span>
               </div>
               <span className="font-semibold text-foreground">{attendanceStats.late}</span>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-info" />
-                <span className="text-foreground">Total Overtime</span>
+                <Clock className="h-5 w-5 text-primary" />
+                <span className="text-foreground">Working Days (Month)</span>
               </div>
-              <span className="font-semibold text-foreground">{attendanceStats.totalOvertime.toFixed(1)}h</span>
+              <span className="font-semibold text-foreground">{workingDaysInMonth}</span>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-3">
+                <Clock className="h-5 w-5 text-info" />
+                <span className="text-foreground">Total Hours Worked</span>
+              </div>
+              <span className="font-semibold text-foreground">{attendanceStats.totalHours.toFixed(1)}h</span>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-success/10 border border-success/20">
+              <div className="flex items-center gap-3">
+                <TrendingUp className="h-5 w-5 text-success" />
+                <span className="text-foreground font-medium">Total Overtime</span>
+              </div>
+              <span className="font-bold text-success">{attendanceStats.totalOvertime.toFixed(1)}h</span>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+              <div className="flex items-center gap-3">
+                <XCircle className="h-5 w-5 text-destructive" />
+                <span className="text-foreground font-medium">Loss Time</span>
+              </div>
+              <span className="font-bold text-destructive">{lossTime.toFixed(1)}h</span>
             </div>
           </div>
         </div>
