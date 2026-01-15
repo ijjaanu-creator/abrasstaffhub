@@ -6,6 +6,21 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { exportToCSV, formatAttendanceForExport, formatPayrollForExport } from '@/lib/exportUtils';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
   Download,
   Calendar,
   Users,
@@ -18,13 +33,184 @@ import {
   Loader2,
   FileText,
   BarChart3,
+  ChevronRight,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 const COLORS = ['hsl(142, 76%, 36%)', 'hsl(0, 84%, 60%)', 'hsl(38, 92%, 50%)', 'hsl(217, 91%, 60%)'];
 
+type CategoryType = 'present' | 'absent' | 'late' | 'overtime' | 'lossTime' | null;
+
+interface CategoryDetailDialogProps {
+  category: CategoryType;
+  onClose: () => void;
+  attendanceData: any[];
+  selectedMonth: string;
+  expectedHoursPerDay: number;
+}
+
+function CategoryDetailDialog({ 
+  category, 
+  onClose, 
+  attendanceData, 
+  selectedMonth,
+  expectedHoursPerDay 
+}: CategoryDetailDialogProps) {
+  if (!category) return null;
+
+  const getCategoryTitle = () => {
+    switch (category) {
+      case 'present': return 'Present Staff';
+      case 'absent': return 'Absent Staff';
+      case 'late': return 'Late Arrivals';
+      case 'overtime': return 'Overtime Details';
+      case 'lossTime': return 'Loss Time Details';
+      default: return '';
+    }
+  };
+
+  const getCategoryIcon = () => {
+    switch (category) {
+      case 'present': return <CheckCircle2 className="h-5 w-5 text-success" />;
+      case 'absent': return <XCircle className="h-5 w-5 text-destructive" />;
+      case 'late': return <AlertCircle className="h-5 w-5 text-warning" />;
+      case 'overtime': return <TrendingUp className="h-5 w-5 text-success" />;
+      case 'lossTime': return <XCircle className="h-5 w-5 text-destructive" />;
+      default: return null;
+    }
+  };
+
+  const getFilteredData = () => {
+    switch (category) {
+      case 'present':
+        return attendanceData.filter((a: any) => a.status === 'present');
+      case 'absent':
+        return attendanceData.filter((a: any) => a.status === 'absent');
+      case 'late':
+        return attendanceData.filter((a: any) => a.status === 'late');
+      case 'overtime':
+        return attendanceData.filter((a: any) => Number(a.overtime || 0) > 0);
+      case 'lossTime':
+        // Staff who worked less than expected hours
+        return attendanceData.filter((a: any) => {
+          const hoursWorked = Number(a.work_hours || 0);
+          return hoursWorked < expectedHoursPerDay && a.status !== 'absent';
+        });
+      default:
+        return [];
+    }
+  };
+
+  const filteredData = getFilteredData();
+
+  // Group by staff member for summary
+  const staffSummary = new Map<string, { 
+    name: string; 
+    position: string; 
+    department: string;
+    employeeId: string;
+    count: number; 
+    totalHours: number;
+    totalOvertime: number;
+    dates: string[];
+  }>();
+
+  filteredData.forEach((record: any) => {
+    const staffId = record.staff_members?.id || record.staff_id;
+    const existing = staffSummary.get(staffId);
+    
+    if (existing) {
+      existing.count++;
+      existing.totalHours += Number(record.work_hours || 0);
+      existing.totalOvertime += Number(record.overtime || 0);
+      existing.dates.push(record.date);
+    } else {
+      staffSummary.set(staffId, {
+        name: record.staff_members?.name || 'Unknown',
+        position: record.staff_members?.position || '',
+        department: record.staff_members?.department || '',
+        employeeId: record.staff_members?.employee_id || '',
+        count: 1,
+        totalHours: Number(record.work_hours || 0),
+        totalOvertime: Number(record.overtime || 0),
+        dates: [record.date],
+      });
+    }
+  });
+
+  const summaryArray = Array.from(staffSummary.values()).sort((a, b) => {
+    if (category === 'overtime') return b.totalOvertime - a.totalOvertime;
+    if (category === 'lossTime') return a.totalHours - b.totalHours;
+    return b.count - a.count;
+  });
+
+  return (
+    <Dialog open={!!category} onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-3xl max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {getCategoryIcon()}
+            {getCategoryTitle()} - {new Date(selectedMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </DialogTitle>
+        </DialogHeader>
+        
+        <ScrollArea className="h-[60vh]">
+          {summaryArray.length === 0 ? (
+            <div className="flex items-center justify-center h-32 text-muted-foreground">
+              No records found for this category
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead className="text-center">
+                    {category === 'overtime' ? 'Overtime Hours' : category === 'lossTime' ? 'Hours Worked' : 'Days'}
+                  </TableHead>
+                  {(category === 'overtime' || category === 'lossTime') && (
+                    <TableHead className="text-center">Records</TableHead>
+                  )}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {summaryArray.map((staff, index) => (
+                  <TableRow key={index}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{staff.name}</p>
+                        <p className="text-xs text-muted-foreground">{staff.employeeId} • {staff.position}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>{staff.department}</TableCell>
+                    <TableCell className="text-center font-semibold">
+                      {category === 'overtime' ? (
+                        <span className="text-success">{staff.totalOvertime.toFixed(1)}h</span>
+                      ) : category === 'lossTime' ? (
+                        <span className="text-destructive">{staff.totalHours.toFixed(1)}h</span>
+                      ) : (
+                        staff.count
+                      )}
+                    </TableCell>
+                    {(category === 'overtime' || category === 'lossTime') && (
+                      <TableCell className="text-center text-muted-foreground">
+                        {staff.count} day{staff.count > 1 ? 's' : ''}
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Reports() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedCategory, setSelectedCategory] = useState<CategoryType>(null);
   const { toast } = useToast();
 
   // Fetch attendance for the selected month
@@ -355,27 +541,45 @@ export default function Reports() {
             </Button>
           </div>
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <button
+              onClick={() => setSelectedCategory('present')}
+              className="w-full flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
+            >
               <div className="flex items-center gap-3">
                 <CheckCircle2 className="h-5 w-5 text-success" />
                 <span className="text-foreground">Present Days</span>
               </div>
-              <span className="font-semibold text-foreground">{attendanceStats.present}</span>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-foreground">{attendanceStats.present}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
+            </button>
+            <button
+              onClick={() => setSelectedCategory('absent')}
+              className="w-full flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
+            >
               <div className="flex items-center gap-3">
                 <XCircle className="h-5 w-5 text-destructive" />
                 <span className="text-foreground">Absent Days</span>
               </div>
-              <span className="font-semibold text-foreground">{attendanceStats.absent}</span>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-foreground">{attendanceStats.absent}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
+            </button>
+            <button
+              onClick={() => setSelectedCategory('late')}
+              className="w-full flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
+            >
               <div className="flex items-center gap-3">
                 <AlertCircle className="h-5 w-5 text-warning" />
                 <span className="text-foreground">Late Arrivals</span>
               </div>
-              <span className="font-semibold text-foreground">{attendanceStats.late}</span>
-            </div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-foreground">{attendanceStats.late}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
+            </button>
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <Clock className="h-5 w-5 text-primary" />
@@ -390,21 +594,42 @@ export default function Reports() {
               </div>
               <span className="font-semibold text-foreground">{attendanceStats.totalHours.toFixed(1)}h</span>
             </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-success/10 border border-success/20">
+            <button
+              onClick={() => setSelectedCategory('overtime')}
+              className="w-full flex items-center justify-between p-3 rounded-lg bg-success/10 border border-success/20 hover:bg-success/20 transition-colors cursor-pointer group"
+            >
               <div className="flex items-center gap-3">
                 <TrendingUp className="h-5 w-5 text-success" />
                 <span className="text-foreground font-medium">Total Overtime</span>
               </div>
-              <span className="font-bold text-success">{attendanceStats.totalOvertime.toFixed(1)}h</span>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-success">{attendanceStats.totalOvertime.toFixed(1)}h</span>
+                <ChevronRight className="h-4 w-4 text-success/70 group-hover:text-success transition-colors" />
+              </div>
+            </button>
+            <button
+              onClick={() => setSelectedCategory('lossTime')}
+              className="w-full flex items-center justify-between p-3 rounded-lg bg-destructive/10 border border-destructive/20 hover:bg-destructive/20 transition-colors cursor-pointer group"
+            >
               <div className="flex items-center gap-3">
                 <XCircle className="h-5 w-5 text-destructive" />
                 <span className="text-foreground font-medium">Loss Time</span>
               </div>
-              <span className="font-bold text-destructive">{lossTime.toFixed(1)}h</span>
-            </div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-destructive">{lossTime.toFixed(1)}h</span>
+                <ChevronRight className="h-4 w-4 text-destructive/70 group-hover:text-destructive transition-colors" />
+              </div>
+            </button>
           </div>
+
+          {/* Category Detail Dialog */}
+          <CategoryDetailDialog
+            category={selectedCategory}
+            onClose={() => setSelectedCategory(null)}
+            attendanceData={attendanceData}
+            selectedMonth={selectedMonth}
+            expectedHoursPerDay={expectedHoursPerDay}
+          />
         </div>
 
         {/* Payroll Stats */}
