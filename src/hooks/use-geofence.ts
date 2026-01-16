@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 // Allowed locations (converted from DMS to decimal degrees)
@@ -36,6 +36,50 @@ export function useGeofence() {
   const [isChecking, setIsChecking] = useState(false);
   const [isWithinGeofence, setIsWithinGeofence] = useState<boolean | null>(null);
   const [currentDistance, setCurrentDistance] = useState<number | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+
+  const processPosition = useCallback((
+    position: GeolocationPosition,
+    resolve: (value: boolean) => void,
+    stopWatching: () => void
+  ) => {
+    const { latitude, longitude, accuracy } = position.coords;
+    
+    // Find the closest allowed location
+    let minDistance = Infinity;
+    let closestLocation = '';
+
+    for (const loc of ALLOWED_LOCATIONS) {
+      const distance = calculateDistance(latitude, longitude, loc.lat, loc.lng);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestLocation = loc.name;
+      }
+    }
+
+    // Only accept position if accuracy is reasonable (< 150m) or we've been waiting too long
+    // For iPhone 7 and older devices, we accept lower accuracy
+    if (accuracy > 200) {
+      console.log(`Waiting for better accuracy. Current: ${accuracy}m`);
+      return; // Keep watching for better accuracy
+    }
+
+    stopWatching();
+    setCurrentDistance(Math.round(minDistance));
+    const isWithin = minDistance <= MAX_DISTANCE_METERS;
+    setIsWithinGeofence(isWithin);
+    setIsChecking(false);
+
+    if (!isWithin) {
+      toast({
+        title: 'Outside allowed area',
+        description: `You are ${Math.round(minDistance)}m away. Must be within ${MAX_DISTANCE_METERS}m of office location.`,
+        variant: 'destructive',
+      });
+    }
+
+    resolve(isWithin);
+  }, [toast]);
 
   const checkLocation = useCallback((): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -53,65 +97,129 @@ export function useGeofence() {
         return;
       }
 
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          
-          // Find the closest allowed location
-          let minDistance = Infinity;
-          let closestLocation = '';
+      // Clear any existing watcher
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
 
-          for (const loc of ALLOWED_LOCATIONS) {
-            const distance = calculateDistance(latitude, longitude, loc.lat, loc.lng);
-            if (distance < minDistance) {
-              minDistance = distance;
-              closestLocation = loc.name;
-            }
-          }
+      const stopWatching = () => {
+        if (watchIdRef.current !== null) {
+          navigator.geolocation.clearWatch(watchIdRef.current);
+          watchIdRef.current = null;
+        }
+      };
 
-          setCurrentDistance(Math.round(minDistance));
-          const isWithin = minDistance <= MAX_DISTANCE_METERS;
-          setIsWithinGeofence(isWithin);
-          setIsChecking(false);
+      let hasResolved = false;
+      let bestPosition: GeolocationPosition | null = null;
 
-          if (!isWithin) {
-            toast({
-              title: 'Outside allowed area',
-              description: `You are ${Math.round(minDistance)}m away. Must be within ${MAX_DISTANCE_METERS}m of office location.`,
-              variant: 'destructive',
-            });
-          }
+      const handleSuccess = (position: GeolocationPosition) => {
+        if (hasResolved) return;
 
-          resolve(isWithin);
-        },
-        (error) => {
-          setIsChecking(false);
-          setIsWithinGeofence(false);
-          
-          let message = 'Unable to get your location.';
-          if (error.code === error.PERMISSION_DENIED) {
-            message = 'Location permission denied. Please enable location access.';
-          } else if (error.code === error.POSITION_UNAVAILABLE) {
-            message = 'Location information unavailable.';
-          } else if (error.code === error.TIMEOUT) {
-            message = 'Location request timed out.';
-          }
+        // Keep track of the best position we've received
+        if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
+          bestPosition = position;
+        }
 
-          toast({
-            title: 'Location Error',
-            description: message,
-            variant: 'destructive',
-          });
-          resolve(false);
-        },
+        // Accept if accuracy is good enough
+        if (position.coords.accuracy <= 150) {
+          hasResolved = true;
+          processPosition(position, resolve, stopWatching);
+        }
+      };
+
+      const handleError = (error: GeolocationPositionError) => {
+        if (hasResolved) return;
+        
+        // If we have any position, use it even if not ideal
+        if (bestPosition) {
+          hasResolved = true;
+          processPosition(bestPosition, resolve, stopWatching);
+          return;
+        }
+
+        stopWatching();
+        setIsChecking(false);
+        setIsWithinGeofence(false);
+        
+        let message = 'Unable to get your location.';
+        if (error.code === error.PERMISSION_DENIED) {
+          message = 'Location permission denied. Please enable location access in Settings > Safari > Location.';
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          message = 'Location information unavailable. Please ensure GPS is enabled.';
+        } else if (error.code === error.TIMEOUT) {
+          message = 'Location request timed out. Please try again.';
+        }
+
+        toast({
+          title: 'Location Error',
+          description: message,
+          variant: 'destructive',
+        });
+        hasResolved = true;
+        resolve(false);
+      };
+
+      // Use watchPosition for better accuracy on iOS devices (especially iPhone 7)
+      // This allows the GPS to "warm up" and provide more accurate readings
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        handleSuccess,
+        handleError,
         {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 15000, // Increased timeout for older devices
           maximumAge: 0,
         }
       );
+
+      // Fallback: After 8 seconds, use the best position we have
+      setTimeout(() => {
+        if (!hasResolved) {
+          if (bestPosition) {
+            hasResolved = true;
+            processPosition(bestPosition, resolve, stopWatching);
+          } else {
+            // Try one more time with lower accuracy requirement
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                if (!hasResolved) {
+                  hasResolved = true;
+                  processPosition(position, resolve, stopWatching);
+                }
+              },
+              (error) => {
+                if (!hasResolved) {
+                  hasResolved = true;
+                  handleError(error);
+                }
+              },
+              {
+                enableHighAccuracy: false, // Try with lower accuracy as fallback
+                timeout: 5000,
+                maximumAge: 30000, // Accept cached position up to 30 seconds old
+              }
+            );
+          }
+        }
+      }, 8000);
+
+      // Final timeout after 15 seconds
+      setTimeout(() => {
+        if (!hasResolved) {
+          hasResolved = true;
+          stopWatching();
+          setIsChecking(false);
+          setIsWithinGeofence(false);
+          toast({
+            title: 'Location Timeout',
+            description: 'Could not get your location. Please check your GPS settings and try again.',
+            variant: 'destructive',
+          });
+          resolve(false);
+        }
+      }, 15000);
     });
-  }, [toast]);
+  }, [toast, processPosition]);
 
   return {
     checkLocation,

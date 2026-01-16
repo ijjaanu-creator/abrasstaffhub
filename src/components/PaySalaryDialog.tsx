@@ -21,7 +21,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, IndianRupee, Users, User } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Loader2, IndianRupee, Users, User, Wallet, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface PaySalaryDialogProps {
@@ -33,6 +34,8 @@ const months = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
+
+type PaymentMode = 'full' | 'advance' | 'balance';
 
 export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
   const { toast } = useToast();
@@ -46,6 +49,9 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
   const [bonus, setBonus] = useState('0');
   const [deductions, setDeductions] = useState('0');
   const [markAsPaid, setMarkAsPaid] = useState(true);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('full');
+  const [advanceAmount, setAdvanceAmount] = useState('');
+  const [notes, setNotes] = useState('');
 
   // Fetch active staff members
   const { data: staffMembers = [], isLoading: staffLoading } = useQuery({
@@ -62,7 +68,27 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
     enabled: open,
   });
 
+  // Fetch pending balance records for the selected staff
+  const { data: pendingBalanceRecords = [] } = useQuery({
+    queryKey: ['pending-balance-records', selectedStaffId, month, year],
+    queryFn: async () => {
+      if (!selectedStaffId) return [];
+      const { data, error } = await supabase
+        .from('payroll_records')
+        .select('*')
+        .eq('staff_id', selectedStaffId)
+        .eq('month', month)
+        .eq('year', parseInt(year))
+        .eq('payment_mode', 'advance')
+        .gt('remaining_amount', 0);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && paymentMode === 'balance' && !!selectedStaffId,
+  });
+
   const selectedStaff = staffMembers.find(s => s.id === selectedStaffId);
+  const pendingBalance = pendingBalanceRecords.reduce((sum, r) => sum + Number(r.remaining_amount || 0), 0);
 
   const createPayrollMutation = useMutation({
     mutationFn: async () => {
@@ -80,31 +106,102 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
       const status = markAsPaid ? 'paid' : 'pending';
       const paymentDate = markAsPaid ? format(new Date(), 'yyyy-MM-dd') : null;
 
-      const records = staffToProcess.map(staff => ({
-        staff_id: staff.id,
-        month,
-        year: yearNum,
-        base_salary: staff.salary,
-        bonus: bonusAmount,
-        deductions: deductionsAmount,
-        overtime: 0,
-        net_salary: staff.salary + bonusAmount - deductionsAmount,
-        status,
-        payment_date: paymentDate,
-      }));
+      // Handle balance payment (pay remaining amount from previous advance)
+      if (paymentMode === 'balance' && pendingBalanceRecords.length > 0) {
+        for (const record of pendingBalanceRecords) {
+          // Update the original payroll record
+          const { error: updateError } = await supabase
+            .from('payroll_records')
+            .update({
+              status: 'paid',
+              remaining_amount: 0,
+              payment_date: paymentDate,
+            })
+            .eq('id', record.id);
 
-      const { error } = await supabase
+          if (updateError) throw updateError;
+
+          // Create balance payment record
+          const { error: advanceError } = await supabase
+            .from('salary_advances')
+            .insert({
+              payroll_id: record.id,
+              staff_id: record.staff_id,
+              amount: Number(record.remaining_amount),
+              payment_date: paymentDate,
+              payment_type: 'balance',
+              notes: notes || `Balance payment for ${month} ${year}`,
+            });
+
+          if (advanceError) throw advanceError;
+        }
+        return pendingBalanceRecords.length;
+      }
+
+      const records = staffToProcess.map(staff => {
+        const netSalary = staff.salary + bonusAmount - deductionsAmount;
+        const advanceAmt = paymentMode === 'advance' ? parseFloat(advanceAmount) || 0 : 0;
+        const remainingAmt = paymentMode === 'advance' ? netSalary - advanceAmt : 0;
+
+        return {
+          staff_id: staff.id,
+          month,
+          year: yearNum,
+          base_salary: staff.salary,
+          bonus: bonusAmount,
+          deductions: deductionsAmount,
+          overtime: 0,
+          net_salary: netSalary,
+          status: paymentMode === 'advance' ? 'pending' : status,
+          payment_date: paymentDate,
+          payment_mode: paymentMode,
+          advance_amount: advanceAmt,
+          advance_date: paymentMode === 'advance' ? paymentDate : null,
+          remaining_amount: remainingAmt,
+        };
+      });
+
+      const { data: insertedRecords, error } = await supabase
         .from('payroll_records')
-        .insert(records);
+        .insert(records)
+        .select();
       
       if (error) throw error;
+
+      // Create salary advance records for tracking
+      if (paymentMode === 'advance' && insertedRecords) {
+        const advanceRecords = insertedRecords.map(record => ({
+          payroll_id: record.id,
+          staff_id: record.staff_id,
+          amount: parseFloat(advanceAmount) || 0,
+          payment_date: paymentDate,
+          payment_type: 'advance' as const,
+          notes: notes || `Advance payment for ${month} ${year}`,
+        }));
+
+        const { error: advanceError } = await supabase
+          .from('salary_advances')
+          .insert(advanceRecords);
+
+        if (advanceError) throw advanceError;
+      }
+
       return records.length;
     },
     onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ['payroll-records'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-balance-records'] });
+      queryClient.invalidateQueries({ queryKey: ['recentPayroll'] });
+      
+      const message = paymentMode === 'advance' 
+        ? `Advance of ₹${parseFloat(advanceAmount).toLocaleString()} paid. Balance pending.`
+        : paymentMode === 'balance'
+        ? `Balance payment of ₹${pendingBalance.toLocaleString()} completed.`
+        : `Created ${count} payroll record${count > 1 ? 's' : ''}.`;
+      
       toast({ 
         title: 'Salary payment created!',
-        description: `Created ${count} payroll record${count > 1 ? 's' : ''}.`
+        description: message
       });
       onOpenChange(false);
       resetForm();
@@ -126,9 +223,15 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
     setBonus('0');
     setDeductions('0');
     setMarkAsPaid(true);
+    setPaymentMode('full');
+    setAdvanceAmount('');
+    setNotes('');
   };
 
   const calculateNetSalary = () => {
+    if (paymentMode === 'balance') {
+      return pendingBalance;
+    }
     if (paymentType === 'bulk') {
       const total = staffMembers.reduce((sum, s) => {
         return sum + s.salary + (parseFloat(bonus) || 0) - (parseFloat(deductions) || 0);
@@ -139,9 +242,13 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
     return selectedStaff.salary + (parseFloat(bonus) || 0) - (parseFloat(deductions) || 0);
   };
 
+  const netSalary = calculateNetSalary();
+  const advanceAmt = parseFloat(advanceAmount) || 0;
+  const remainingAmount = paymentMode === 'advance' ? netSalary - advanceAmt : 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <IndianRupee className="h-5 w-5 text-primary" />
@@ -159,7 +266,10 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
               type="button"
               variant={paymentType === 'individual' ? 'default' : 'outline'}
               className="flex-1"
-              onClick={() => setPaymentType('individual')}
+              onClick={() => {
+                setPaymentType('individual');
+                setPaymentMode('full');
+              }}
             >
               <User className="h-4 w-4 mr-2" />
               Individual
@@ -168,7 +278,10 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
               type="button"
               variant={paymentType === 'bulk' ? 'default' : 'outline'}
               className="flex-1"
-              onClick={() => setPaymentType('bulk')}
+              onClick={() => {
+                setPaymentType('bulk');
+                setPaymentMode('full');
+              }}
             >
               <Users className="h-4 w-4 mr-2" />
               All Staff ({staffMembers.length})
@@ -230,52 +343,132 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
             </div>
           </div>
 
-          {/* Bonus & Deductions */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Bonus (₹)</Label>
-              <Input
-                type="number"
-                value={bonus}
-                onChange={(e) => setBonus(e.target.value)}
-                min="0"
-                placeholder="0"
-              />
+          {/* Payment Mode Selection - Only for individual */}
+          {paymentType === 'individual' && selectedStaffId && (
+            <div className="space-y-3">
+              <Label>Payment Mode</Label>
+              <RadioGroup 
+                value={paymentMode} 
+                onValueChange={(v) => setPaymentMode(v as PaymentMode)}
+                className="grid grid-cols-3 gap-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="full" id="full" />
+                  <Label htmlFor="full" className="text-sm font-normal cursor-pointer">
+                    Full Payment
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="advance" id="advance" />
+                  <Label htmlFor="advance" className="text-sm font-normal cursor-pointer">
+                    Advance
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="balance" id="balance" disabled={pendingBalance === 0} />
+                  <Label 
+                    htmlFor="balance" 
+                    className={`text-sm font-normal cursor-pointer ${pendingBalance === 0 ? 'text-muted-foreground' : ''}`}
+                  >
+                    Pay Balance
+                  </Label>
+                </div>
+              </RadioGroup>
+              {pendingBalance > 0 && paymentMode !== 'balance' && (
+                <p className="text-xs text-warning">
+                  ₹{pendingBalance.toLocaleString()} pending balance from previous advance
+                </p>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label>Deductions (₹)</Label>
-              <Input
-                type="number"
-                value={deductions}
-                onChange={(e) => setDeductions(e.target.value)}
-                min="0"
-                placeholder="0"
-              />
-            </div>
-          </div>
+          )}
 
-          {/* Mark as Paid */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="mark-paid"
-              checked={markAsPaid}
-              onCheckedChange={(checked) => setMarkAsPaid(checked === true)}
-            />
-            <Label htmlFor="mark-paid" className="text-sm font-normal cursor-pointer">
-              Mark as paid immediately
-            </Label>
-          </div>
+          {/* Advance Amount Input */}
+          {paymentMode === 'advance' && (
+            <div className="space-y-2">
+              <Label>Advance Amount (₹)</Label>
+              <Input
+                type="number"
+                value={advanceAmount}
+                onChange={(e) => setAdvanceAmount(e.target.value)}
+                min="0"
+                max={netSalary}
+                placeholder={`Max: ₹${netSalary.toLocaleString()}`}
+              />
+              {advanceAmt > 0 && advanceAmt <= netSalary && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Wallet className="h-3 w-3" />
+                  <span>Paying ₹{advanceAmt.toLocaleString()}</span>
+                  <ArrowRight className="h-3 w-3" />
+                  <span className="text-warning">₹{remainingAmount.toLocaleString()} balance pending</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Notes for advance/balance */}
+          {(paymentMode === 'advance' || paymentMode === 'balance') && (
+            <div className="space-y-2">
+              <Label>Notes (optional)</Label>
+              <Input
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Add a note for this payment"
+              />
+            </div>
+          )}
+
+          {/* Bonus & Deductions - Hidden for balance payment */}
+          {paymentMode !== 'balance' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Bonus (₹)</Label>
+                <Input
+                  type="number"
+                  value={bonus}
+                  onChange={(e) => setBonus(e.target.value)}
+                  min="0"
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Deductions (₹)</Label>
+                <Input
+                  type="number"
+                  value={deductions}
+                  onChange={(e) => setDeductions(e.target.value)}
+                  min="0"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Mark as Paid - Only for full payment */}
+          {paymentMode === 'full' && (
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="mark-paid"
+                checked={markAsPaid}
+                onCheckedChange={(checked) => setMarkAsPaid(checked === true)}
+              />
+              <Label htmlFor="mark-paid" className="text-sm font-normal cursor-pointer">
+                Mark as paid immediately
+              </Label>
+            </div>
+          )}
 
           {/* Summary */}
           <div className="rounded-lg bg-muted/50 p-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">
-                {paymentType === 'bulk' ? 'Total Staff' : 'Base Salary'}
+                {paymentMode === 'balance' ? 'Pending Balance' : paymentType === 'bulk' ? 'Total Staff' : 'Base Salary'}
               </span>
               <span className="font-medium">
-                {paymentType === 'bulk' 
-                  ? `${staffMembers.length} members`
-                  : selectedStaff ? `₹${selectedStaff.salary.toLocaleString()}` : '-'
+                {paymentMode === 'balance' 
+                  ? `₹${pendingBalance.toLocaleString()}`
+                  : paymentType === 'bulk' 
+                    ? `${staffMembers.length} members`
+                    : selectedStaff ? `₹${selectedStaff.salary.toLocaleString()}` : '-'
                 }
               </span>
             </div>
@@ -283,11 +476,25 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
               <span className="text-muted-foreground">Period</span>
               <span className="font-medium">{month} {year}</span>
             </div>
+            {paymentMode === 'advance' && advanceAmt > 0 && (
+              <>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Advance Now</span>
+                  <span className="font-medium text-success">₹{advanceAmt.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Balance Later</span>
+                  <span className="font-medium text-warning">₹{remainingAmount.toLocaleString()}</span>
+                </div>
+              </>
+            )}
             <div className="border-t border-border my-2" />
             <div className="flex justify-between">
-              <span className="font-medium">Net Amount</span>
+              <span className="font-medium">
+                {paymentMode === 'advance' ? 'Paying Now' : paymentMode === 'balance' ? 'Balance Amount' : 'Net Amount'}
+              </span>
               <span className="font-bold text-primary text-lg">
-                ₹{calculateNetSalary().toLocaleString()}
+                ₹{(paymentMode === 'advance' ? advanceAmt : netSalary).toLocaleString()}
               </span>
             </div>
           </div>
@@ -299,14 +506,23 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
           </Button>
           <Button 
             onClick={() => createPayrollMutation.mutate()}
-            disabled={createPayrollMutation.isPending || (paymentType === 'individual' && !selectedStaffId)}
+            disabled={
+              createPayrollMutation.isPending || 
+              (paymentType === 'individual' && !selectedStaffId) ||
+              (paymentMode === 'advance' && (advanceAmt <= 0 || advanceAmt > netSalary)) ||
+              (paymentMode === 'balance' && pendingBalance === 0)
+            }
           >
             {createPayrollMutation.isPending ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
               <IndianRupee className="h-4 w-4 mr-2" />
             )}
-            {markAsPaid ? 'Pay Now' : 'Create Record'}
+            {paymentMode === 'advance' 
+              ? 'Pay Advance' 
+              : paymentMode === 'balance' 
+                ? 'Pay Balance' 
+                : markAsPaid ? 'Pay Now' : 'Create Record'}
           </Button>
         </DialogFooter>
       </DialogContent>

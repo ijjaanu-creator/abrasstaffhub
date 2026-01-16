@@ -170,6 +170,8 @@ export type Database = {
       }
       payroll_records: {
         Row: {
+          advance_amount: number | null
+          advance_date: string | null
           base_salary: number
           bonus: number | null
           created_at: string
@@ -179,11 +181,15 @@ export type Database = {
           net_salary: number
           overtime: number | null
           payment_date: string | null
+          payment_mode: string | null
+          remaining_amount: number | null
           staff_id: string
           status: string
           year: number
         }
         Insert: {
+          advance_amount?: number | null
+          advance_date?: string | null
           base_salary: number
           bonus?: number | null
           created_at?: string
@@ -193,11 +199,15 @@ export type Database = {
           net_salary: number
           overtime?: number | null
           payment_date?: string | null
+          payment_mode?: string | null
+          remaining_amount?: number | null
           staff_id: string
           status?: string
           year: number
         }
         Update: {
+          advance_amount?: number | null
+          advance_date?: string | null
           base_salary?: number
           bonus?: number | null
           created_at?: string
@@ -207,6 +217,8 @@ export type Database = {
           net_salary?: number
           overtime?: number | null
           payment_date?: string | null
+          payment_mode?: string | null
+          remaining_amount?: number | null
           staff_id?: string
           status?: string
           year?: number
@@ -250,6 +262,54 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      salary_advances: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_type: string
+          payroll_id: string | null
+          staff_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_type: string
+          payroll_id?: string | null
+          staff_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_type?: string
+          payroll_id?: string | null
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salary_advances_payroll_id_fkey"
+            columns: ["payroll_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_advances_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_members"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       staff_members: {
         Row: {
