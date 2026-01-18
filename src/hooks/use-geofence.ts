@@ -37,34 +37,45 @@ export function useGeofence() {
   const [isWithinGeofence, setIsWithinGeofence] = useState<boolean | null>(null);
   const [currentDistance, setCurrentDistance] = useState<number | null>(null);
   const watchIdRef = useRef<number | null>(null);
+  const resolvedRef = useRef(false);
 
-  const processPosition = useCallback((
-    position: GeolocationPosition,
-    resolve: (value: boolean) => void,
-    stopWatching: () => void
-  ) => {
-    const { latitude, longitude, accuracy } = position.coords;
-    
-    // Find the closest allowed location
+  const cleanup = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+  }, []);
+
+  const calculateMinDistance = useCallback((latitude: number, longitude: number) => {
     let minDistance = Infinity;
-    let closestLocation = '';
-
     for (const loc of ALLOWED_LOCATIONS) {
       const distance = calculateDistance(latitude, longitude, loc.lat, loc.lng);
       if (distance < minDistance) {
         minDistance = distance;
-        closestLocation = loc.name;
       }
     }
+    return minDistance;
+  }, []);
 
-    // Only accept position if accuracy is reasonable (< 150m) or we've been waiting too long
-    // For iPhone 7 and older devices, we accept lower accuracy
-    if (accuracy > 200) {
-      console.log(`Waiting for better accuracy. Current: ${accuracy}m`);
-      return; // Keep watching for better accuracy
-    }
+  const finishCheck = useCallback((
+    position: GeolocationPosition,
+    resolve: (value: boolean) => void
+  ) => {
+    if (resolvedRef.current) return;
+    resolvedRef.current = true;
+    
+    cleanup();
+    
+    const { latitude, longitude } = position.coords;
+    const minDistance = calculateMinDistance(latitude, longitude);
+    
+    console.log('Location check complete:', {
+      latitude,
+      longitude,
+      accuracy: position.coords.accuracy,
+      distance: Math.round(minDistance),
+    });
 
-    stopWatching();
     setCurrentDistance(Math.round(minDistance));
     const isWithin = minDistance <= MAX_DISTANCE_METERS;
     setIsWithinGeofence(isWithin);
@@ -79,11 +90,50 @@ export function useGeofence() {
     }
 
     resolve(isWithin);
-  }, [toast]);
+  }, [cleanup, calculateMinDistance, toast]);
+
+  const handleError = useCallback((
+    error: GeolocationPositionError,
+    resolve: (value: boolean) => void,
+    bestPosition: GeolocationPosition | null
+  ) => {
+    if (resolvedRef.current) return;
+    
+    // If we have any position at all, use it
+    if (bestPosition) {
+      finishCheck(bestPosition, resolve);
+      return;
+    }
+
+    resolvedRef.current = true;
+    cleanup();
+    setIsChecking(false);
+    setIsWithinGeofence(false);
+
+    let message = 'Unable to get your location.';
+    if (error.code === error.PERMISSION_DENIED) {
+      message = 'Location permission denied. Please enable location access in your device settings.';
+    } else if (error.code === error.POSITION_UNAVAILABLE) {
+      message = 'Location unavailable. Please ensure GPS is enabled and try again.';
+    } else if (error.code === error.TIMEOUT) {
+      message = 'Location request timed out. Please move to an open area and try again.';
+    }
+
+    console.error('Geolocation error:', error.code, error.message);
+    toast({
+      title: 'Location Error',
+      description: message,
+      variant: 'destructive',
+    });
+    resolve(false);
+  }, [cleanup, finishCheck, toast]);
 
   const checkLocation = useCallback((): Promise<boolean> => {
     return new Promise((resolve) => {
+      // Reset state
+      resolvedRef.current = false;
       setIsChecking(true);
+      setIsWithinGeofence(null);
 
       if (!navigator.geolocation) {
         toast({
@@ -98,128 +148,127 @@ export function useGeofence() {
       }
 
       // Clear any existing watcher
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
+      cleanup();
 
-      const stopWatching = () => {
-        if (watchIdRef.current !== null) {
-          navigator.geolocation.clearWatch(watchIdRef.current);
-          watchIdRef.current = null;
-        }
-      };
-
-      let hasResolved = false;
       let bestPosition: GeolocationPosition | null = null;
+      let attempts = 0;
+      const maxAttempts = 5;
 
-      const handleSuccess = (position: GeolocationPosition) => {
-        if (hasResolved) return;
-
-        // Keep track of the best position we've received
-        if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
+      // Strategy 1: Try getCurrentPosition first (works better on some devices)
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          console.log('Initial getCurrentPosition success:', {
+            accuracy: position.coords.accuracy,
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+          
           bestPosition = position;
-        }
-
-        // Accept if accuracy is good enough
-        if (position.coords.accuracy <= 150) {
-          hasResolved = true;
-          processPosition(position, resolve, stopWatching);
-        }
-      };
-
-      const handleError = (error: GeolocationPositionError) => {
-        if (hasResolved) return;
-        
-        // If we have any position, use it even if not ideal
-        if (bestPosition) {
-          hasResolved = true;
-          processPosition(bestPosition, resolve, stopWatching);
-          return;
-        }
-
-        stopWatching();
-        setIsChecking(false);
-        setIsWithinGeofence(false);
-        
-        let message = 'Unable to get your location.';
-        if (error.code === error.PERMISSION_DENIED) {
-          message = 'Location permission denied. Please enable location access in Settings > Safari > Location.';
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          message = 'Location information unavailable. Please ensure GPS is enabled.';
-        } else if (error.code === error.TIMEOUT) {
-          message = 'Location request timed out. Please try again.';
-        }
-
-        toast({
-          title: 'Location Error',
-          description: message,
-          variant: 'destructive',
-        });
-        hasResolved = true;
-        resolve(false);
-      };
-
-      // Use watchPosition for better accuracy on iOS devices (especially iPhone 7)
-      // This allows the GPS to "warm up" and provide more accurate readings
-      watchIdRef.current = navigator.geolocation.watchPosition(
-        handleSuccess,
-        handleError,
+          
+          // If accuracy is good enough (<100m), use it immediately
+          if (position.coords.accuracy <= 100) {
+            finishCheck(position, resolve);
+            return;
+          }
+          
+          // Otherwise, start watching for better accuracy
+          startWatching();
+        },
+        (error) => {
+          console.log('Initial getCurrentPosition failed, starting watch:', error.message);
+          // Fall back to watchPosition
+          startWatching();
+        },
         {
           enableHighAccuracy: true,
-          timeout: 15000, // Increased timeout for older devices
-          maximumAge: 0,
+          timeout: 8000,
+          maximumAge: 10000, // Accept cached position up to 10 seconds old
         }
       );
 
-      // Fallback: After 8 seconds, use the best position we have
-      setTimeout(() => {
-        if (!hasResolved) {
+      function startWatching() {
+        if (resolvedRef.current) return;
+
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          (position) => {
+            if (resolvedRef.current) return;
+            
+            attempts++;
+            console.log(`Watch position update #${attempts}:`, {
+              accuracy: position.coords.accuracy,
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            });
+
+            // Track the best (most accurate) position
+            if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
+              bestPosition = position;
+            }
+
+            // Accept if accuracy is good enough or we've had enough attempts
+            if (position.coords.accuracy <= 100 || attempts >= maxAttempts) {
+              finishCheck(bestPosition, resolve);
+            }
+          },
+          (error) => {
+            console.error('Watch position error:', error.message);
+            // Don't immediately fail - wait for timeout to use best position
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 5000,
+          }
+        );
+
+        // Fallback timeout: After 6 seconds, use best available position
+        setTimeout(() => {
+          if (resolvedRef.current) return;
+          
           if (bestPosition) {
-            hasResolved = true;
-            processPosition(bestPosition, resolve, stopWatching);
+            console.log('Using best available position after timeout');
+            finishCheck(bestPosition, resolve);
           } else {
-            // Try one more time with lower accuracy requirement
+            // Try one more time with lower accuracy
             navigator.geolocation.getCurrentPosition(
               (position) => {
-                if (!hasResolved) {
-                  hasResolved = true;
-                  processPosition(position, resolve, stopWatching);
-                }
+                if (resolvedRef.current) return;
+                finishCheck(position, resolve);
               },
               (error) => {
-                if (!hasResolved) {
-                  hasResolved = true;
-                  handleError(error);
-                }
+                handleError(error, resolve, null);
               },
               {
-                enableHighAccuracy: false, // Try with lower accuracy as fallback
+                enableHighAccuracy: false,
                 timeout: 5000,
-                maximumAge: 30000, // Accept cached position up to 30 seconds old
+                maximumAge: 60000, // Accept position up to 1 minute old
               }
             );
           }
-        }
-      }, 8000);
+        }, 6000);
 
-      // Final timeout after 15 seconds
-      setTimeout(() => {
-        if (!hasResolved) {
-          hasResolved = true;
-          stopWatching();
-          setIsChecking(false);
-          setIsWithinGeofence(false);
-          toast({
-            title: 'Location Timeout',
-            description: 'Could not get your location. Please check your GPS settings and try again.',
-            variant: 'destructive',
-          });
-          resolve(false);
-        }
-      }, 15000);
+        // Final timeout: Give up after 12 seconds total
+        setTimeout(() => {
+          if (resolvedRef.current) return;
+          
+          if (bestPosition) {
+            finishCheck(bestPosition, resolve);
+          } else {
+            resolvedRef.current = true;
+            cleanup();
+            setIsChecking(false);
+            setIsWithinGeofence(false);
+            toast({
+              title: 'Location Timeout',
+              description: 'Could not get your location. Please check GPS is enabled and try again.',
+              variant: 'destructive',
+            });
+            resolve(false);
+          }
+        }, 12000);
+      }
     });
-  }, [toast, processPosition]);
+  }, [toast, cleanup, finishCheck, handleError]);
 
   return {
     checkLocation,
