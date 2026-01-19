@@ -25,7 +25,7 @@ export default function MarkAttendance() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { enrollFace, verifyFace, isEnrolling, isVerifying } = useFaceAuth();
-  const { checkLocation, isChecking: isCheckingLocation, maxDistance } = useGeofence();
+  const { checkLocation, isChecking: isCheckingLocation, maxDistance, currentDistance, isWithinGeofence } = useGeofence();
   const { startTracking, stopTracking, isTracking } = useLocationTracking();
   const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -415,10 +415,17 @@ export default function MarkAttendance() {
             </Button>
           </div>
         )}
-        <p className="text-xs text-center text-muted-foreground mt-4">
-          <MapPin className="inline h-3 w-3 mr-1" />
-          Must be within {maxDistance}m of office to mark attendance
-        </p>
+        <div className="text-xs text-center text-muted-foreground mt-4 space-y-1">
+          <p>
+            <MapPin className="inline h-3 w-3 mr-1" />
+            Must be within {maxDistance}m of office to mark attendance
+          </p>
+          {currentDistance !== null && (
+            <p className={isWithinGeofence ? 'text-success' : 'text-destructive'}>
+              Current distance: {currentDistance}m {isWithinGeofence ? '✓' : '✗'}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Face Capture Modal */}

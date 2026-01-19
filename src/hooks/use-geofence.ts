@@ -66,25 +66,49 @@ export function useGeofence() {
     
     cleanup();
     
-    const { latitude, longitude } = position.coords;
+    const { latitude, longitude, accuracy } = position.coords;
+    
+    // Validate coordinates
+    if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude)) {
+      console.error('Invalid coordinates received:', { latitude, longitude });
+      setIsChecking(false);
+      setIsWithinGeofence(false);
+      setCurrentDistance(null);
+      toast({
+        title: 'Location Error',
+        description: 'Invalid location data received. Please try again.',
+        variant: 'destructive',
+      });
+      resolve(false);
+      return;
+    }
+    
     const minDistance = calculateMinDistance(latitude, longitude);
+    const roundedDistance = Math.round(minDistance);
     
     console.log('Location check complete:', {
       latitude,
       longitude,
-      accuracy: position.coords.accuracy,
-      distance: Math.round(minDistance),
+      accuracy: Math.round(accuracy),
+      distance: roundedDistance,
     });
 
-    setCurrentDistance(Math.round(minDistance));
+    // Set distance first before checking geofence
+    setCurrentDistance(roundedDistance);
+    
     const isWithin = minDistance <= MAX_DISTANCE_METERS;
     setIsWithinGeofence(isWithin);
     setIsChecking(false);
 
-    if (!isWithin) {
+    if (isWithin) {
+      toast({
+        title: 'Location verified',
+        description: `You are ${roundedDistance}m from office. ✓`,
+      });
+    } else {
       toast({
         title: 'Outside allowed area',
-        description: `You are ${Math.round(minDistance)}m away. Must be within ${MAX_DISTANCE_METERS}m of office location.`,
+        description: `You are ${roundedDistance}m away. Must be within ${MAX_DISTANCE_METERS}m of office location.`,
         variant: 'destructive',
       });
     }
@@ -134,6 +158,7 @@ export function useGeofence() {
       resolvedRef.current = false;
       setIsChecking(true);
       setIsWithinGeofence(null);
+      setCurrentDistance(null); // Reset distance on new check
 
       if (!navigator.geolocation) {
         toast({
