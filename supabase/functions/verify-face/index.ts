@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,44 @@ serve(async (req) => {
   }
 
   try {
+    // Validate authentication
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ match: false, confidence: 0, reason: 'Unauthorized', error: 'UNAUTHORIZED' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('[verify-face] Missing Supabase configuration');
+      return new Response(
+        JSON.stringify({ match: false, confidence: 0, reason: 'Service configuration error', error: 'CONFIG_ERROR' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims?.sub) {
+      console.error('[verify-face] Authentication failed:', claimsError?.message);
+      return new Response(
+        JSON.stringify({ match: false, confidence: 0, reason: 'Unauthorized', error: 'UNAUTHORIZED' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = claimsData.claims.sub;
+    console.log('[verify-face] Authenticated user:', userId);
+
     const { enrolledImageUrl, capturedImageBase64 } = await req.json();
 
     console.log('[verify-face] request received', {
@@ -22,7 +61,6 @@ serve(async (req) => {
     });
 
     if (!enrolledImageUrl || !capturedImageBase64) {
-      // Return 200 so clients don't surface a generic "non-2xx" error
       return new Response(
         JSON.stringify({ match: false, confidence: 0, reason: 'Missing required images', error: 'MISSING_IMAGES' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -33,7 +71,7 @@ serve(async (req) => {
     if (!LOVABLE_API_KEY) {
       console.error('[verify-face] LOVABLE_API_KEY is not configured');
       return new Response(
-        JSON.stringify({ match: false, confidence: 0, reason: 'AI service not configured', error: 'AI_NOT_CONFIGURED' }),
+        JSON.stringify({ match: false, confidence: 0, reason: 'Verification unavailable', error: 'SERVICE_ERROR' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -89,14 +127,12 @@ or
       const errorText = await response.text();
       console.error('[verify-face] AI API error:', response.status, errorText);
 
-      // Always 200 to avoid "non-2xx" errors on the client.
       return new Response(
         JSON.stringify({
           match: false,
           confidence: 0,
-          reason: 'Face verification service error',
-          error: 'AI_API_ERROR',
-          status: response.status,
+          reason: 'Verification failed',
+          error: 'SERVICE_ERROR',
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -133,7 +169,6 @@ or
     console.error('[verify-face] Error:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
 
-    // Return 200 to prevent generic non-2xx surfacing; provide error details for UI.
     return new Response(
       JSON.stringify({ match: false, confidence: 0, reason: message, error: 'SERVER_ERROR' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
