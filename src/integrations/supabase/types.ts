@@ -461,6 +461,7 @@ export type Database = {
     }
     Functions: {
       bootstrap_first_admin: { Args: never; Returns: boolean }
+      check_phone_exists: { Args: { _phone: string }; Returns: boolean }
       get_admin_user_ids: {
         Args: never
         Returns: {
@@ -477,6 +478,13 @@ export type Database = {
       link_staff_to_user: {
         Args: { _email: string; _staff_id: string; _user_id: string }
         Returns: boolean
+      }
+      validate_staff_signup: {
+        Args: { _phone: string }
+        Returns: {
+          already_linked: boolean
+          staff_id: string
+        }[]
       }
     }
     Enums: {
