@@ -163,20 +163,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     name: string, 
     phone: string
   ): Promise<{ error: string | null }> => {
-    // First check if phone number exists in staff_members table
-    const { data: staffMember, error: staffError } = await supabase
-      .from('staff_members')
-      .select('id, user_id')
-      .eq('phone', phone)
-      .single();
+    // Use secure RPC function to validate phone without exposing staff data
+    const { data: validationResult, error: validationError } = await supabase
+      .rpc('validate_staff_signup', { _phone: phone });
 
-    if (staffError || !staffMember) {
+    if (validationError) {
+      console.error('Validation error:', validationError);
+      return { error: 'Unable to verify your phone number. Please try again.' };
+    }
+
+    if (!validationResult || validationResult.length === 0) {
       return { error: 'Your phone number is not registered. Please contact admin to be added as staff.' };
     }
 
-    if (staffMember.user_id) {
+    const staffData = validationResult[0];
+    
+    if (staffData.already_linked) {
       return { error: 'This phone number is already linked to an account.' };
     }
+
+    const staffMemberId = staffData.staff_id;
 
     // Sign up the user
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -198,7 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (authData.user) {
       // Link the staff member to the new user using secure function (bypasses RLS)
       const { error: linkError } = await supabase.rpc('link_staff_to_user', {
-        _staff_id: staffMember.id,
+        _staff_id: staffMemberId,
         _user_id: authData.user.id,
         _email: email,
       });
