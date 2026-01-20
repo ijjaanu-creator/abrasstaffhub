@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_chat_history: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       attendance_records: {
         Row: {
           check_in: string | null
@@ -60,6 +84,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      chat_messages: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          receiver_id: string
+          sender_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          receiver_id: string
+          sender_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          receiver_id?: string
+          sender_id?: string
+        }
+        Relationships: []
       }
       departments: {
         Row: {
