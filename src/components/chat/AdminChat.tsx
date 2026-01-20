@@ -27,16 +27,13 @@ export function AdminChat() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
-  // Fetch admin users (for staff to send messages to)
+  // Fetch admin users (for staff to send messages to) using security definer function
   const { data: adminUsers } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "admin");
+      const { data, error } = await supabase.rpc("get_admin_user_ids");
       if (error) throw error;
-      return data;
+      return data as { user_id: string }[];
     },
     enabled: !isAdmin && !!user,
   });
