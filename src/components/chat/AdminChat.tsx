@@ -41,32 +41,17 @@ export function AdminChat() {
     enabled: !isAdmin && !!user,
   });
 
-  // For admins: fetch staff who have messaged
+  // For admins: fetch ALL staff members with user accounts
   const { data: chatStaff } = useQuery({
     queryKey: ["chat-staff"],
     queryFn: async () => {
       if (!user) return [];
       
-      const { data: messages, error } = await supabase
-        .from("chat_messages")
-        .select("sender_id, receiver_id")
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
-      
-      if (error) throw error;
-      
-      // Get unique staff IDs who have chatted with this admin
-      const staffIds = new Set<string>();
-      messages?.forEach(m => {
-        if (m.sender_id !== user.id) staffIds.add(m.sender_id);
-        if (m.receiver_id !== user.id) staffIds.add(m.receiver_id);
-      });
-      
-      if (staffIds.size === 0) return [];
-      
+      // Get all staff members who have linked user accounts
       const { data: staffMembers, error: staffError } = await supabase
         .from("staff_members")
         .select("id, name, user_id")
-        .in("user_id", Array.from(staffIds));
+        .not("user_id", "is", null);
       
       if (staffError) throw staffError;
       return staffMembers || [];
