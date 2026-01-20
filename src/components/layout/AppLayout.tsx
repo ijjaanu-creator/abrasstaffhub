@@ -6,6 +6,8 @@ import { Menu, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { BrandLogo } from '@/components/BrandLogo';
+import { AIAssistant } from '@/components/chat/AIAssistant';
+import { AdminChat } from '@/components/chat/AdminChat';
 
 export function AppLayout() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -58,6 +60,10 @@ export function AppLayout() {
           <Outlet />
         </div>
       </main>
+
+      {/* Floating Chat Components */}
+      <AIAssistant />
+      <AdminChat />
     </div>
   );
 }
