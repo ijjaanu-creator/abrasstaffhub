@@ -6,18 +6,17 @@ import { useToast } from '@/hooks/use-toast';
 // 2. 10°44'05.5"N 76°01'39.0"E = 10.734861, 76.027500
 const ALLOWED_LOCATIONS = [
   { lat: 10.745778, lng: 76.041944, name: 'Location 1' },
-  { lat: 10.734861, lng: 76.027500, name: 'Location 2' },
+  { lat: 10.734861, lng: 76.0275, name: 'Location 2' },
 ];
 
 const MAX_DISTANCE_METERS = 100;
+// If GPS accuracy is worse than this, distances can be wildly wrong.
+const MAX_ACCEPTABLE_ACCURACY_METERS = 200;
+// Prevent using very stale cached positions (common cause of “I’m far away” when you’re actually at the office).
+const MAX_POSITION_AGE_MS = 30_000;
 
 // Haversine formula to calculate distance between two points
-function calculateDistance(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000; // Earth's radius in meters
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -29,6 +28,12 @@ function calculateDistance(
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
+}
+
+function isValidCoordinate(latitude: number, longitude: number) {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return false;
+  if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return false;
+  return true;
 }
 
 export function useGeofence() {
@@ -50,107 +55,124 @@ export function useGeofence() {
     let minDistance = Infinity;
     for (const loc of ALLOWED_LOCATIONS) {
       const distance = calculateDistance(latitude, longitude, loc.lat, loc.lng);
-      if (distance < minDistance) {
-        minDistance = distance;
-      }
+      if (distance < minDistance) minDistance = distance;
     }
     return minDistance;
   }, []);
 
-  const finishCheck = useCallback((
-    position: GeolocationPosition,
-    resolve: (value: boolean) => void
-  ) => {
-    if (resolvedRef.current) return;
-    resolvedRef.current = true;
-    
-    cleanup();
-    
-    const { latitude, longitude, accuracy } = position.coords;
-    
-    // Validate coordinates
-    if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude)) {
-      console.error('Invalid coordinates received:', { latitude, longitude });
+  const finishCheck = useCallback(
+    (position: GeolocationPosition, resolve: (value: boolean) => void) => {
+      if (resolvedRef.current) return;
+      resolvedRef.current = true;
+
+      cleanup();
+
+      const { latitude, longitude, accuracy } = position.coords;
+      const ageMs = Date.now() - position.timestamp;
+
+      // Validate coordinates
+      if (!isValidCoordinate(latitude, longitude)) {
+        console.error('Invalid coordinates received:', { latitude, longitude });
+        setIsChecking(false);
+        setIsWithinGeofence(false);
+        setCurrentDistance(null);
+        toast({
+          title: 'Location Error',
+          description: 'Invalid location data received. Please try again.',
+          variant: 'destructive',
+        });
+        resolve(false);
+        return;
+      }
+
+      // If accuracy is too poor, distance results are unreliable.
+      if (Number.isFinite(accuracy) && accuracy > MAX_ACCEPTABLE_ACCURACY_METERS) {
+        console.warn('Location accuracy too low for geofence check:', { accuracy, ageMs });
+        setIsChecking(false);
+        setIsWithinGeofence(false);
+        setCurrentDistance(null);
+        toast({
+          title: 'GPS accuracy too low',
+          description: `Your GPS accuracy is ±${Math.round(accuracy)}m. Move to an open area and try again.`,
+          variant: 'destructive',
+        });
+        resolve(false);
+        return;
+      }
+
+      const minDistance = calculateMinDistance(latitude, longitude);
+      const roundedDistance = Math.round(minDistance);
+
+      console.log('Location check complete:', {
+        latitude,
+        longitude,
+        accuracy: Math.round(accuracy),
+        ageMs,
+        distance: roundedDistance,
+      });
+
+      setCurrentDistance(roundedDistance);
+
+      const isWithin = minDistance <= MAX_DISTANCE_METERS;
+      setIsWithinGeofence(isWithin);
+      setIsChecking(false);
+
+      if (isWithin) {
+        toast({
+          title: 'Location verified',
+          description: `You are ${roundedDistance}m from office.`,
+        });
+      } else {
+        toast({
+          title: 'Outside allowed area',
+          description: `You are ${roundedDistance}m away. Must be within ${MAX_DISTANCE_METERS}m of office location.`,
+          variant: 'destructive',
+        });
+      }
+
+      resolve(isWithin);
+    },
+    [cleanup, calculateMinDistance, toast]
+  );
+
+  const handleError = useCallback(
+    (
+      error: GeolocationPositionError,
+      resolve: (value: boolean) => void,
+      bestPosition: GeolocationPosition | null
+    ) => {
+      if (resolvedRef.current) return;
+
+      // If we have any position at all, use it
+      if (bestPosition) {
+        finishCheck(bestPosition, resolve);
+        return;
+      }
+
+      resolvedRef.current = true;
+      cleanup();
       setIsChecking(false);
       setIsWithinGeofence(false);
-      setCurrentDistance(null);
+
+      let message = 'Unable to get your location.';
+      if (error.code === error.PERMISSION_DENIED) {
+        message = 'Location permission denied. Please enable location access in your device settings.';
+      } else if (error.code === error.POSITION_UNAVAILABLE) {
+        message = 'Location unavailable. Please ensure GPS is enabled and try again.';
+      } else if (error.code === error.TIMEOUT) {
+        message = 'Location request timed out. Please move to an open area and try again.';
+      }
+
+      console.error('Geolocation error:', error.code, error.message);
       toast({
         title: 'Location Error',
-        description: 'Invalid location data received. Please try again.',
+        description: message,
         variant: 'destructive',
       });
       resolve(false);
-      return;
-    }
-    
-    const minDistance = calculateMinDistance(latitude, longitude);
-    const roundedDistance = Math.round(minDistance);
-    
-    console.log('Location check complete:', {
-      latitude,
-      longitude,
-      accuracy: Math.round(accuracy),
-      distance: roundedDistance,
-    });
-
-    // Set distance first before checking geofence
-    setCurrentDistance(roundedDistance);
-    
-    const isWithin = minDistance <= MAX_DISTANCE_METERS;
-    setIsWithinGeofence(isWithin);
-    setIsChecking(false);
-
-    if (isWithin) {
-      toast({
-        title: 'Location verified',
-        description: `You are ${roundedDistance}m from office. ✓`,
-      });
-    } else {
-      toast({
-        title: 'Outside allowed area',
-        description: `You are ${roundedDistance}m away. Must be within ${MAX_DISTANCE_METERS}m of office location.`,
-        variant: 'destructive',
-      });
-    }
-
-    resolve(isWithin);
-  }, [cleanup, calculateMinDistance, toast]);
-
-  const handleError = useCallback((
-    error: GeolocationPositionError,
-    resolve: (value: boolean) => void,
-    bestPosition: GeolocationPosition | null
-  ) => {
-    if (resolvedRef.current) return;
-    
-    // If we have any position at all, use it
-    if (bestPosition) {
-      finishCheck(bestPosition, resolve);
-      return;
-    }
-
-    resolvedRef.current = true;
-    cleanup();
-    setIsChecking(false);
-    setIsWithinGeofence(false);
-
-    let message = 'Unable to get your location.';
-    if (error.code === error.PERMISSION_DENIED) {
-      message = 'Location permission denied. Please enable location access in your device settings.';
-    } else if (error.code === error.POSITION_UNAVAILABLE) {
-      message = 'Location unavailable. Please ensure GPS is enabled and try again.';
-    } else if (error.code === error.TIMEOUT) {
-      message = 'Location request timed out. Please move to an open area and try again.';
-    }
-
-    console.error('Geolocation error:', error.code, error.message);
-    toast({
-      title: 'Location Error',
-      description: message,
-      variant: 'destructive',
-    });
-    resolve(false);
-  }, [cleanup, finishCheck, toast]);
+    },
+    [cleanup, finishCheck, toast]
+  );
 
   const checkLocation = useCallback((): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -158,7 +180,7 @@ export function useGeofence() {
       resolvedRef.current = false;
       setIsChecking(true);
       setIsWithinGeofence(null);
-      setCurrentDistance(null); // Reset distance on new check
+      setCurrentDistance(null);
 
       if (!navigator.geolocation) {
         toast({
@@ -172,42 +194,60 @@ export function useGeofence() {
         return;
       }
 
-      // Clear any existing watcher
       cleanup();
 
       let bestPosition: GeolocationPosition | null = null;
       let attempts = 0;
-      const maxAttempts = 5;
+      const maxAttempts = 6;
 
-      // Strategy 1: Try getCurrentPosition first (works better on some devices)
+      const considerPosition = (position: GeolocationPosition) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        const ageMs = Date.now() - position.timestamp;
+
+        if (!isValidCoordinate(latitude, longitude)) return false;
+
+        // Ignore very stale cached points; they cause wrong “meters away” readings.
+        if (ageMs > MAX_POSITION_AGE_MS) {
+          console.log('Ignoring stale position:', { ageMs, accuracy });
+          return false;
+        }
+
+        // Track the best (most accurate) position
+        if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
+          bestPosition = position;
+        }
+
+        return true;
+      };
+
+      // Strategy 1: Try getCurrentPosition first, but FORCE fresh GPS (no cache)
       navigator.geolocation.getCurrentPosition(
         (position) => {
           console.log('Initial getCurrentPosition success:', {
             accuracy: position.coords.accuracy,
             lat: position.coords.latitude,
             lng: position.coords.longitude,
+            ageMs: Date.now() - position.timestamp,
           });
-          
-          bestPosition = position;
-          
-          // If accuracy is good enough (<100m), use it immediately
-          if (position.coords.accuracy <= 100) {
-            finishCheck(position, resolve);
+
+          const accepted = considerPosition(position);
+
+          // If the position is fresh + accurate enough, use it immediately.
+          if (accepted && position.coords.accuracy <= 60) {
+            finishCheck(bestPosition ?? position, resolve);
             return;
           }
-          
-          // Otherwise, start watching for better accuracy
+
           startWatching();
         },
         (error) => {
           console.log('Initial getCurrentPosition failed, starting watch:', error.message);
-          // Fall back to watchPosition
           startWatching();
         },
         {
           enableHighAccuracy: true,
-          timeout: 8000,
-          maximumAge: 10000, // Accept cached position up to 10 seconds old
+          timeout: 10_000,
+          maximumAge: 0,
         }
       );
 
@@ -217,65 +257,67 @@ export function useGeofence() {
         watchIdRef.current = navigator.geolocation.watchPosition(
           (position) => {
             if (resolvedRef.current) return;
-            
+
             attempts++;
+            const ageMs = Date.now() - position.timestamp;
             console.log(`Watch position update #${attempts}:`, {
               accuracy: position.coords.accuracy,
               lat: position.coords.latitude,
               lng: position.coords.longitude,
+              ageMs,
             });
 
-            // Track the best (most accurate) position
-            if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
-              bestPosition = position;
-            }
+            considerPosition(position);
 
             // Accept if accuracy is good enough or we've had enough attempts
-            if (position.coords.accuracy <= 100 || attempts >= maxAttempts) {
-              finishCheck(bestPosition, resolve);
+            if ((bestPosition && bestPosition.coords.accuracy <= 60) || attempts >= maxAttempts) {
+              if (bestPosition) finishCheck(bestPosition, resolve);
             }
           },
           (error) => {
             console.error('Watch position error:', error.message);
-            // Don't immediately fail - wait for timeout to use best position
           },
           {
             enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 5000,
+            timeout: 15_000,
+            maximumAge: 0,
           }
         );
 
-        // Fallback timeout: After 6 seconds, use best available position
+        // Fallback timeout: after 8s, use the best available (fresh) position, or try once with low accuracy.
         setTimeout(() => {
           if (resolvedRef.current) return;
-          
+
           if (bestPosition) {
             console.log('Using best available position after timeout');
             finishCheck(bestPosition, resolve);
           } else {
-            // Try one more time with lower accuracy
             navigator.geolocation.getCurrentPosition(
               (position) => {
                 if (resolvedRef.current) return;
-                finishCheck(position, resolve);
+                // even low-accuracy attempt should still be reasonably fresh
+                if (considerPosition(position)) {
+                  finishCheck(bestPosition ?? position, resolve);
+                } else {
+                  // keep waiting for watchPosition until final timeout
+                }
               },
               (error) => {
                 handleError(error, resolve, null);
               },
               {
                 enableHighAccuracy: false,
-                timeout: 5000,
-                maximumAge: 60000, // Accept position up to 1 minute old
+                timeout: 8_000,
+                maximumAge: 0,
               }
             );
           }
-        }, 6000);
+        }, 8000);
 
-        // Final timeout: Give up after 12 seconds total
+        // Final timeout: Give up after 18 seconds total
         setTimeout(() => {
           if (resolvedRef.current) return;
-          
+
           if (bestPosition) {
             finishCheck(bestPosition, resolve);
           } else {
@@ -290,7 +332,7 @@ export function useGeofence() {
             });
             resolve(false);
           }
-        }, 12000);
+        }, 18_000);
       }
     });
   }, [toast, cleanup, finishCheck, handleError]);
@@ -303,3 +345,4 @@ export function useGeofence() {
     maxDistance: MAX_DISTANCE_METERS,
   };
 }
+
