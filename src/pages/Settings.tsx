@@ -231,14 +231,30 @@ function DataResetSection() {
 export default function Settings() {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
-  const [isSaving, setIsSaving] = useState(false);
+  const queryClient = useQueryClient();
 
-  // Settings state
+  // Fetch settings from database
+  const { data: savedSettings, isLoading: isLoadingSettings } = useQuery({
+    queryKey: ['appSettings', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id && isAdmin,
+  });
+
+  // Settings state with defaults
   const [settings, setSettings] = useState({
     companyName: 'Abras Natural Spices',
     workStartTime: '09:00',
     workEndTime: '18:00',
-    lateThreshold: 15, // minutes
+    lateThreshold: 15,
     halfDayHours: 4,
     fullDayHours: 8,
     overtimeRate: 1.5,
@@ -248,12 +264,85 @@ export default function Settings() {
     autoCheckoutTime: '20:00',
   });
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    // Simulate saving - in real app, save to database
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    toast({ title: 'Settings saved successfully!' });
-    setIsSaving(false);
+  // Update local state when saved settings are loaded
+  useState(() => {
+    if (savedSettings) {
+      setSettings({
+        companyName: savedSettings.company_name || 'Abras Natural Spices',
+        workStartTime: savedSettings.work_start_time?.slice(0, 5) || '09:00',
+        workEndTime: savedSettings.work_end_time?.slice(0, 5) || '18:00',
+        lateThreshold: savedSettings.late_threshold ?? 15,
+        halfDayHours: savedSettings.half_day_hours ?? 4,
+        fullDayHours: savedSettings.full_day_hours ?? 8,
+        overtimeRate: savedSettings.overtime_rate ?? 1.5,
+        enableNotifications: savedSettings.enable_notifications ?? true,
+        enableEmailAlerts: savedSettings.enable_email_alerts ?? false,
+        enableAutoCheckout: savedSettings.enable_auto_checkout ?? true,
+        autoCheckoutTime: savedSettings.auto_checkout_time?.slice(0, 5) || '20:00',
+      });
+    }
+  });
+
+  // Sync settings when savedSettings changes
+  useState(() => {});
+  
+  // Use effect to update settings when data loads
+  const [hasInitialized, setHasInitialized] = useState(false);
+  
+  if (savedSettings && !hasInitialized) {
+    setSettings({
+      companyName: savedSettings.company_name || 'Abras Natural Spices',
+      workStartTime: savedSettings.work_start_time?.slice(0, 5) || '09:00',
+      workEndTime: savedSettings.work_end_time?.slice(0, 5) || '18:00',
+      lateThreshold: savedSettings.late_threshold ?? 15,
+      halfDayHours: savedSettings.half_day_hours ?? 4,
+      fullDayHours: savedSettings.full_day_hours ?? 8,
+      overtimeRate: savedSettings.overtime_rate ?? 1.5,
+      enableNotifications: savedSettings.enable_notifications ?? true,
+      enableEmailAlerts: savedSettings.enable_email_alerts ?? false,
+      enableAutoCheckout: savedSettings.enable_auto_checkout ?? true,
+      autoCheckoutTime: savedSettings.auto_checkout_time?.slice(0, 5) || '20:00',
+    });
+    setHasInitialized(true);
+  }
+
+  // Save mutation
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!user?.id) throw new Error('Not authenticated');
+      
+      const settingsData = {
+        user_id: user.id,
+        company_name: settings.companyName,
+        work_start_time: settings.workStartTime + ':00',
+        work_end_time: settings.workEndTime + ':00',
+        late_threshold: settings.lateThreshold,
+        half_day_hours: settings.halfDayHours,
+        full_day_hours: settings.fullDayHours,
+        overtime_rate: settings.overtimeRate,
+        enable_notifications: settings.enableNotifications,
+        enable_email_alerts: settings.enableEmailAlerts,
+        enable_auto_checkout: settings.enableAutoCheckout,
+        auto_checkout_time: settings.autoCheckoutTime + ':00',
+      };
+
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert(settingsData, { onConflict: 'user_id' });
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appSettings'] });
+      toast({ title: 'Settings saved successfully!' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error saving settings', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const handleSave = () => {
+    saveMutation.mutate();
   };
 
   if (!isAdmin) {
@@ -280,10 +369,10 @@ export default function Settings() {
         </div>
         <Button 
           onClick={handleSave} 
-          disabled={isSaving}
+          disabled={saveMutation.isPending || isLoadingSettings}
           size="lg"
         >
-          {isSaving ? (
+          {saveMutation.isPending ? (
             <Loader2 className="h-5 w-5 mr-2 animate-spin" />
           ) : (
             <Save className="h-5 w-5 mr-2" />

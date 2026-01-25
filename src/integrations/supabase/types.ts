@@ -38,6 +38,60 @@ export type Database = {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          auto_checkout_time: string | null
+          company_name: string | null
+          created_at: string
+          enable_auto_checkout: boolean | null
+          enable_email_alerts: boolean | null
+          enable_notifications: boolean | null
+          full_day_hours: number | null
+          half_day_hours: number | null
+          id: string
+          late_threshold: number | null
+          overtime_rate: number | null
+          updated_at: string
+          user_id: string
+          work_end_time: string | null
+          work_start_time: string | null
+        }
+        Insert: {
+          auto_checkout_time?: string | null
+          company_name?: string | null
+          created_at?: string
+          enable_auto_checkout?: boolean | null
+          enable_email_alerts?: boolean | null
+          enable_notifications?: boolean | null
+          full_day_hours?: number | null
+          half_day_hours?: number | null
+          id?: string
+          late_threshold?: number | null
+          overtime_rate?: number | null
+          updated_at?: string
+          user_id: string
+          work_end_time?: string | null
+          work_start_time?: string | null
+        }
+        Update: {
+          auto_checkout_time?: string | null
+          company_name?: string | null
+          created_at?: string
+          enable_auto_checkout?: boolean | null
+          enable_email_alerts?: boolean | null
+          enable_notifications?: boolean | null
+          full_day_hours?: number | null
+          half_day_hours?: number | null
+          id?: string
+          late_threshold?: number | null
+          overtime_rate?: number | null
+          updated_at?: string
+          user_id?: string
+          work_end_time?: string | null
+          work_start_time?: string | null
+        }
+        Relationships: []
+      }
       attendance_records: {
         Row: {
           check_in: string | null
