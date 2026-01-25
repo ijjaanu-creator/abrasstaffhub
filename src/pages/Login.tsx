@@ -124,7 +124,7 @@ export default function Login() {
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
         options: {
-          shouldCreateUser: false, // Only allow existing users
+          shouldCreateUser: false,
         },
       });
       
@@ -145,7 +145,7 @@ export default function Login() {
       } else {
         toast({
           title: 'Check your email',
-          description: 'We sent you a login link. Click it to sign in.',
+          description: 'We sent you a 6-digit login code.',
         });
         setStep('otp');
       }
@@ -178,7 +178,7 @@ export default function Login() {
       const { error } = await supabase.auth.verifyOtp({
         email: email.trim(),
         token: otp,
-        type: 'magiclink',
+        type: 'email',
       });
       
       if (error) {
@@ -223,8 +223,8 @@ export default function Login() {
         });
       } else {
         toast({
-          title: 'Link resent',
-          description: 'We sent you a new login link.',
+          title: 'Code resent',
+          description: 'We sent you a new 6-digit code.',
         });
         setOtp('');
       }
@@ -348,15 +348,15 @@ export default function Login() {
                 <ArrowLeft className="h-4 w-4" />
                 Back to login
               </button>
-              <h2 className="font-display text-3xl font-bold text-foreground">Check your email</h2>
+              <h2 className="font-display text-3xl font-bold text-foreground">Enter your code</h2>
               <p className="mt-2 text-muted-foreground">
-                We sent a login link to <span className="font-medium text-foreground">{email}</span>
+                We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span>
               </p>
             </div>
 
             <form onSubmit={handleVerifyOtp} className="space-y-6">
               <div className="space-y-4">
-                <Label>Or enter the 6-digit code</Label>
+                <Label>Enter the 6-digit code</Label>
                 <div className="flex justify-center">
                   <InputOTP
                     maxLength={6}
@@ -393,7 +393,7 @@ export default function Login() {
                   disabled={isLoading}
                   className="text-sm text-primary hover:underline disabled:opacity-50"
                 >
-                  Didn't receive the link? Resend
+                  Didn't receive the code? Resend
                 </button>
               </div>
             </form>
@@ -489,7 +489,7 @@ export default function Login() {
                 onClick={handleSendOtp}
               >
                 <KeyRound className="h-5 w-5 mr-2" />
-                Sign in with email link
+                Sign in with OTP code
               </Button>
             </form>
 
