@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -264,8 +264,8 @@ export default function Settings() {
     autoCheckoutTime: '20:00',
   });
 
-  // Update local state when saved settings are loaded
-  useState(() => {
+  // Sync local state when saved settings are loaded
+  useEffect(() => {
     if (savedSettings) {
       setSettings({
         companyName: savedSettings.company_name || 'Abras Natural Spices',
@@ -281,30 +281,7 @@ export default function Settings() {
         autoCheckoutTime: savedSettings.auto_checkout_time?.slice(0, 5) || '20:00',
       });
     }
-  });
-
-  // Sync settings when savedSettings changes
-  useState(() => {});
-  
-  // Use effect to update settings when data loads
-  const [hasInitialized, setHasInitialized] = useState(false);
-  
-  if (savedSettings && !hasInitialized) {
-    setSettings({
-      companyName: savedSettings.company_name || 'Abras Natural Spices',
-      workStartTime: savedSettings.work_start_time?.slice(0, 5) || '09:00',
-      workEndTime: savedSettings.work_end_time?.slice(0, 5) || '18:00',
-      lateThreshold: savedSettings.late_threshold ?? 15,
-      halfDayHours: savedSettings.half_day_hours ?? 4,
-      fullDayHours: savedSettings.full_day_hours ?? 8,
-      overtimeRate: savedSettings.overtime_rate ?? 1.5,
-      enableNotifications: savedSettings.enable_notifications ?? true,
-      enableEmailAlerts: savedSettings.enable_email_alerts ?? false,
-      enableAutoCheckout: savedSettings.enable_auto_checkout ?? true,
-      autoCheckoutTime: savedSettings.auto_checkout_time?.slice(0, 5) || '20:00',
-    });
-    setHasInitialized(true);
-  }
+  }, [savedSettings]);
 
   // Save mutation
   const saveMutation = useMutation({
