@@ -132,14 +132,33 @@ export default function Profile() {
         backgroundColor: null,
       });
 
-      // Temporarily remove the rotateY transform for capturing the back side
+      // Temporarily remove the rotateY transform and visibility restrictions for capturing the back side
       const backElement = idCardBackRef.current;
       const originalTransform = backElement.style.transform;
-      const originalVisibility = backElement.style.visibility;
-      backElement.style.transform = 'none';
-      backElement.style.visibility = 'visible';
+      const originalClassName = backElement.className;
       
-      // Capture back side without the flip transform
+      // Remove all visibility restrictions and transforms
+      backElement.style.transform = 'none';
+      backElement.className = backElement.className
+        .replace(/invisible/g, '')
+        .replace(/\[transform:rotateY\(180deg\)\]/g, '')
+        .replace(/\[backface-visibility:hidden\]/g, '');
+      
+      // Force all hidden elements to be visible for capture
+      const hiddenElements = backElement.querySelectorAll('.hidden, .sm\\:hidden, .invisible');
+      const originalStyles: { el: Element; display: string; visibility: string }[] = [];
+      hiddenElements.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        originalStyles.push({ 
+          el, 
+          display: htmlEl.style.display,
+          visibility: htmlEl.style.visibility 
+        });
+        htmlEl.style.display = 'block';
+        htmlEl.style.visibility = 'visible';
+      });
+      
+      // Capture back side without restrictions
       const backCanvas = await html2canvas(backElement, {
         scale: 2,
         useCORS: true,
@@ -147,9 +166,14 @@ export default function Profile() {
         backgroundColor: null,
       });
       
-      // Restore original transform
+      // Restore original styles
       backElement.style.transform = originalTransform;
-      backElement.style.visibility = originalVisibility;
+      backElement.className = originalClassName;
+      originalStyles.forEach(({ el, display, visibility }) => {
+        const htmlEl = el as HTMLElement;
+        htmlEl.style.display = display;
+        htmlEl.style.visibility = visibility;
+      });
 
       // Download front
       const frontLink = document.createElement('a');
@@ -187,12 +211,31 @@ export default function Profile() {
         backgroundColor: '#ffffff',
       });
       
-      // Temporarily remove the rotateY transform for capturing the back side
+      // Temporarily remove the rotateY transform and visibility restrictions for capturing the back side
       const backElement = idCardBackRef.current;
       const originalTransform = backElement.style.transform;
-      const originalVisibility = backElement.style.visibility;
+      const originalClassName = backElement.className;
+      
+      // Remove all visibility restrictions and transforms
       backElement.style.transform = 'none';
-      backElement.style.visibility = 'visible';
+      backElement.className = backElement.className
+        .replace(/invisible/g, '')
+        .replace(/\[transform:rotateY\(180deg\)\]/g, '')
+        .replace(/\[backface-visibility:hidden\]/g, '');
+      
+      // Force all hidden elements to be visible for capture
+      const hiddenElements = backElement.querySelectorAll('.hidden, .sm\\:hidden, .invisible');
+      const originalStyles: { el: Element; display: string; visibility: string }[] = [];
+      hiddenElements.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        originalStyles.push({ 
+          el, 
+          display: htmlEl.style.display,
+          visibility: htmlEl.style.visibility 
+        });
+        htmlEl.style.display = 'block';
+        htmlEl.style.visibility = 'visible';
+      });
       
       const backCanvas = await html2canvas(backElement, {
         scale: 2,
@@ -201,9 +244,14 @@ export default function Profile() {
         backgroundColor: '#ffffff',
       });
       
-      // Restore original transform
+      // Restore original styles
       backElement.style.transform = originalTransform;
-      backElement.style.visibility = originalVisibility;
+      backElement.className = originalClassName;
+      originalStyles.forEach(({ el, display, visibility }) => {
+        const htmlEl = el as HTMLElement;
+        htmlEl.style.display = display;
+        htmlEl.style.visibility = visibility;
+      });
 
       const front = frontCanvas.toDataURL('image/png');
       const back = backCanvas.toDataURL('image/png');
