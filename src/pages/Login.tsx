@@ -5,22 +5,26 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Fingerprint, Lock, Mail, Loader2, ArrowLeft, KeyRound } from 'lucide-react';
+import { Fingerprint, Lock, Mail, Loader2, ArrowLeft, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
 const emailSchema = z.string().trim().email({ message: "Please enter a valid email address" });
+const passwordSchema = z.string().min(6, { message: "Password must be at least 6 characters" });
 
-type LoginStep = 'email' | 'otp' | 'forgot-password';
+type LoginStep = 'credentials' | 'otp' | 'forgot-password';
 
 export default function Login() {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState<LoginStep>('email');
+  const [step, setStep] = useState<LoginStep>('credentials');
   const [resetEmail, setResetEmail] = useState('');
   const [isResetting, setIsResetting] = useState(false);
+  const [useOtp, setUseOtp] = useState(false);
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -37,9 +41,72 @@ export default function Login() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const handleSendOtp = async (e: React.FormEvent) => {
+  const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate email
+    const emailValidation = emailSchema.safeParse(email);
+    if (!emailValidation.success) {
+      toast({
+        title: 'Invalid email',
+        description: emailValidation.error.errors[0].message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate password
+    const passwordValidation = passwordSchema.safeParse(password);
+    if (!passwordValidation.success) {
+      toast({
+        title: 'Invalid password',
+        description: passwordValidation.error.errors[0].message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+      
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          toast({
+            title: 'Login failed',
+            description: 'Invalid email or password. Please try again.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Error',
+            description: error.message,
+            variant: 'destructive',
+          });
+        }
+      } else {
+        toast({
+          title: 'Welcome back!',
+          description: 'You have successfully logged in.',
+        });
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Something went wrong. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSendOtp = async () => {
     // Validate email
     const validation = emailSchema.safeParse(email);
     if (!validation.success) {
@@ -78,7 +145,7 @@ export default function Login() {
       } else {
         toast({
           title: 'Check your email',
-          description: 'We sent you a 6-digit code. Enter it below to sign in.',
+          description: 'We sent you a login link. Click it to sign in.',
         });
         setStep('otp');
       }
@@ -156,8 +223,8 @@ export default function Login() {
         });
       } else {
         toast({
-          title: 'Code resent',
-          description: 'We sent you a new 6-digit code.',
+          title: 'Link resent',
+          description: 'We sent you a new login link.',
         });
         setOtp('');
       }
@@ -202,7 +269,7 @@ export default function Login() {
           title: 'Check your email',
           description: 'We sent you a password reset link. Please check your inbox.',
         });
-        setStep('email');
+        setStep('credentials');
         setResetEmail('');
       }
     } catch (error) {
@@ -224,7 +291,7 @@ export default function Login() {
             <div className="text-center lg:text-left">
               <button
                 type="button"
-                onClick={() => setStep('email')}
+                onClick={() => setStep('credentials')}
                 className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -272,23 +339,24 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => {
-                  setStep('email');
+                  setStep('credentials');
                   setOtp('');
+                  setUseOtp(false);
                 }}
                 className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Change email
+                Back to login
               </button>
-              <h2 className="font-display text-3xl font-bold text-foreground">Enter code</h2>
+              <h2 className="font-display text-3xl font-bold text-foreground">Check your email</h2>
               <p className="mt-2 text-muted-foreground">
-                We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span>
+                We sent a login link to <span className="font-medium text-foreground">{email}</span>
               </p>
             </div>
 
             <form onSubmit={handleVerifyOtp} className="space-y-6">
               <div className="space-y-4">
-                <Label>Verification code</Label>
+                <Label>Or enter the 6-digit code</Label>
                 <div className="flex justify-center">
                   <InputOTP
                     maxLength={6}
@@ -325,7 +393,7 @@ export default function Login() {
                   disabled={isLoading}
                   className="text-sm text-primary hover:underline disabled:opacity-50"
                 >
-                  Didn't receive the code? Resend
+                  Didn't receive the link? Resend
                 </button>
               </div>
             </form>
@@ -337,10 +405,10 @@ export default function Login() {
           <>
             <div className="text-center lg:text-left">
               <h2 className="font-display text-3xl font-bold text-foreground">Welcome back</h2>
-              <p className="mt-2 text-muted-foreground">Enter your email to receive a login code</p>
+              <p className="mt-2 text-muted-foreground">Sign in to your account</p>
             </div>
 
-            <form onSubmit={handleSendOtp} className="space-y-6">
+            <form onSubmit={handlePasswordLogin} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="email">Email address</Label>
                 <div className="relative">
@@ -357,18 +425,71 @@ export default function Login() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetEmail(email);
+                      setStep('forgot-password');
+                    }}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10 pr-10 h-12"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+
               <Button type="submit" variant="hero" size="lg" className="w-full" disabled={isLoading}>
                 {isLoading ? (
                   <>
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    Sending code...
+                    Signing in...
                   </>
                 ) : (
-                  <>
-                    <KeyRound className="h-5 w-5 mr-2" />
-                    Send login code
-                  </>
+                  'Sign in'
                 )}
+              </Button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or</span>
+                </div>
+              </div>
+
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="lg" 
+                className="w-full" 
+                disabled={isLoading}
+                onClick={handleSendOtp}
+              >
+                <KeyRound className="h-5 w-5 mr-2" />
+                Sign in with email link
               </Button>
             </form>
 
@@ -418,7 +539,7 @@ export default function Login() {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-foreground/20">
                 <Lock className="h-5 w-5" />
               </div>
-              <span>Secure OTP Login</span>
+              <span>Secure Password & Email Login</span>
             </div>
           </div>
         </div>
