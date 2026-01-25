@@ -429,8 +429,9 @@ export default function Settings() {
                 <Input
                   id="halfDayHours"
                   type="number"
+                  step="0.5"
                   value={settings.halfDayHours}
-                  onChange={(e) => setSettings({ ...settings, halfDayHours: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setSettings({ ...settings, halfDayHours: parseFloat(e.target.value) || 0 })}
                 />
               </div>
               <div className="space-y-2">
@@ -438,8 +439,9 @@ export default function Settings() {
                 <Input
                   id="fullDayHours"
                   type="number"
+                  step="0.5"
                   value={settings.fullDayHours}
-                  onChange={(e) => setSettings({ ...settings, fullDayHours: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setSettings({ ...settings, fullDayHours: parseFloat(e.target.value) || 0 })}
                 />
               </div>
             </div>
