@@ -24,7 +24,6 @@ export default function Login() {
   const [step, setStep] = useState<LoginStep>('credentials');
   const [resetEmail, setResetEmail] = useState('');
   const [isResetting, setIsResetting] = useState(false);
-  const [useOtp, setUseOtp] = useState(false);
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -121,27 +120,19 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          shouldCreateUser: false,
-        },
+      const { error } = await supabase.functions.invoke('send-login-otp', {
+        body: { email: email.trim() },
       });
-      
+
       if (error) {
-        if (error.message.includes('Signups not allowed')) {
-          toast({
-            title: 'Account not found',
-            description: 'No account exists with this email. Please sign up first.',
-            variant: 'destructive',
-          });
-        } else {
-          toast({
-            title: 'Error',
-            description: error.message,
-            variant: 'destructive',
-          });
-        }
+        const msg = error.message || 'Failed to send code.';
+        toast({
+          title: msg.includes('404') ? 'Account not found' : 'Error',
+          description: msg.includes('404')
+            ? 'No account exists with this email. Please sign up first.'
+            : msg,
+          variant: 'destructive',
+        });
       } else {
         toast({
           title: 'Check your email',
@@ -178,7 +169,7 @@ export default function Login() {
       const { error } = await supabase.auth.verifyOtp({
         email: email.trim(),
         token: otp,
-        type: 'email',
+        type: 'magiclink',
       });
       
       if (error) {
@@ -208,11 +199,8 @@ export default function Login() {
   const handleResendOtp = async () => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          shouldCreateUser: false,
-        },
+      const { error } = await supabase.functions.invoke('send-login-otp', {
+        body: { email: email.trim() },
       });
       
       if (error) {
@@ -341,7 +329,6 @@ export default function Login() {
                 onClick={() => {
                   setStep('credentials');
                   setOtp('');
-                  setUseOtp(false);
                 }}
                 className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
               >
