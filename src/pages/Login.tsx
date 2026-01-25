@@ -5,21 +5,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Fingerprint, Lock, Mail, Loader2, ArrowLeft } from 'lucide-react';
-import { BrandLogo } from '@/components/BrandLogo';
+import { Fingerprint, Lock, Mail, Loader2, ArrowLeft, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
 const emailSchema = z.string().trim().email({ message: "Please enter a valid email address" });
 
+type LoginStep = 'email' | 'otp' | 'forgot-password';
+
 export default function Login() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [step, setStep] = useState<LoginStep>('email');
   const [resetEmail, setResetEmail] = useState('');
   const [isResetting, setIsResetting] = useState(false);
-  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -35,24 +37,129 @@ export default function Login() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate email
+    const validation = emailSchema.safeParse(email);
+    if (!validation.success) {
+      toast({
+        title: 'Invalid email',
+        description: validation.error.errors[0].message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const { error } = await login(email, password);
-      if (!error) {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          shouldCreateUser: false, // Only allow existing users
+        },
+      });
+      
+      if (error) {
+        if (error.message.includes('Signups not allowed')) {
+          toast({
+            title: 'Account not found',
+            description: 'No account exists with this email. Please sign up first.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Error',
+            description: error.message,
+            variant: 'destructive',
+          });
+        }
+      } else {
+        toast({
+          title: 'Check your email',
+          description: 'We sent you a 6-digit code. Enter it below to sign in.',
+        });
+        setStep('otp');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Something went wrong. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (otp.length !== 6) {
+      toast({
+        title: 'Invalid code',
+        description: 'Please enter the 6-digit code from your email.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: otp,
+        type: 'email',
+      });
+      
+      if (error) {
+        toast({
+          title: 'Invalid code',
+          description: 'The code you entered is incorrect or has expired.',
+          variant: 'destructive',
+        });
+      } else {
         toast({
           title: 'Welcome back!',
           description: 'You have successfully logged in.',
         });
         navigate('/dashboard');
-      } else {
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Something went wrong. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          shouldCreateUser: false,
+        },
+      });
+      
+      if (error) {
         toast({
-          title: 'Login failed',
-          description: error,
+          title: 'Error',
+          description: error.message,
           variant: 'destructive',
         });
+      } else {
+        toast({
+          title: 'Code resent',
+          description: 'We sent you a new 6-digit code.',
+        });
+        setOtp('');
       }
     } catch (error) {
       toast({
@@ -68,7 +175,6 @@ export default function Login() {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate email
     const validation = emailSchema.safeParse(resetEmail);
     if (!validation.success) {
       toast({
@@ -96,7 +202,7 @@ export default function Login() {
           title: 'Check your email',
           description: 'We sent you a password reset link. Please check your inbox.',
         });
-        setIsForgotPassword(false);
+        setStep('email');
         setResetEmail('');
       }
     } catch (error) {
@@ -107,6 +213,175 @@ export default function Login() {
       });
     } finally {
       setIsResetting(false);
+    }
+  };
+
+  const renderStep = () => {
+    switch (step) {
+      case 'forgot-password':
+        return (
+          <>
+            <div className="text-center lg:text-left">
+              <button
+                type="button"
+                onClick={() => setStep('email')}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to login
+              </button>
+              <h2 className="font-display text-3xl font-bold text-foreground">Reset password</h2>
+              <p className="mt-2 text-muted-foreground">Enter your email to receive a reset link</p>
+            </div>
+
+            <form onSubmit={handleForgotPassword} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="reset-email">Email address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    className="pl-10 h-12"
+                    required
+                  />
+                </div>
+              </div>
+
+              <Button type="submit" variant="hero" size="lg" className="w-full" disabled={isResetting}>
+                {isResetting ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  'Send reset link'
+                )}
+              </Button>
+            </form>
+          </>
+        );
+
+      case 'otp':
+        return (
+          <>
+            <div className="text-center lg:text-left">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('email');
+                  setOtp('');
+                }}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Change email
+              </button>
+              <h2 className="font-display text-3xl font-bold text-foreground">Enter code</h2>
+              <p className="mt-2 text-muted-foreground">
+                We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span>
+              </p>
+            </div>
+
+            <form onSubmit={handleVerifyOtp} className="space-y-6">
+              <div className="space-y-4">
+                <Label>Verification code</Label>
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={otp}
+                    onChange={(value) => setOtp(value)}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+              </div>
+
+              <Button type="submit" variant="hero" size="lg" className="w-full" disabled={isLoading || otp.length !== 6}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  'Verify & Sign in'
+                )}
+              </Button>
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={isLoading}
+                  className="text-sm text-primary hover:underline disabled:opacity-50"
+                >
+                  Didn't receive the code? Resend
+                </button>
+              </div>
+            </form>
+          </>
+        );
+
+      default:
+        return (
+          <>
+            <div className="text-center lg:text-left">
+              <h2 className="font-display text-3xl font-bold text-foreground">Welcome back</h2>
+              <p className="mt-2 text-muted-foreground">Enter your email to receive a login code</p>
+            </div>
+
+            <form onSubmit={handleSendOtp} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10 h-12"
+                    required
+                  />
+                </div>
+              </div>
+
+              <Button type="submit" variant="hero" size="lg" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Sending code...
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="h-5 w-5 mr-2" />
+                    Send login code
+                  </>
+                )}
+              </Button>
+            </form>
+
+            <div className="text-center space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Staff member?{' '}
+                <Link to="/signup" className="text-primary font-medium hover:underline">
+                  Sign up here
+                </Link>
+              </p>
+            </div>
+          </>
+        );
     }
   };
 
@@ -143,7 +418,7 @@ export default function Login() {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-foreground/20">
                 <Lock className="h-5 w-5" />
               </div>
-              <span>Secure & Role-Based Access</span>
+              <span>Secure OTP Login</span>
             </div>
           </div>
         </div>
@@ -163,121 +438,7 @@ export default function Login() {
             </div>
           </div>
 
-          {isForgotPassword ? (
-            <>
-              <div className="text-center lg:text-left">
-                <button
-                  type="button"
-                  onClick={() => setIsForgotPassword(false)}
-                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to login
-                </button>
-                <h2 className="font-display text-3xl font-bold text-foreground">Reset password</h2>
-                <p className="mt-2 text-muted-foreground">Enter your email to receive a reset link</p>
-              </div>
-
-              <form onSubmit={handleForgotPassword} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="reset-email">Email address</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input
-                      id="reset-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={resetEmail}
-                      onChange={(e) => setResetEmail(e.target.value)}
-                      className="pl-10 h-12"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <Button type="submit" variant="hero" size="lg" className="w-full" disabled={isResetting}>
-                  {isResetting ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    'Send reset link'
-                  )}
-                </Button>
-              </form>
-            </>
-          ) : (
-            <>
-              <div className="text-center lg:text-left">
-                <h2 className="font-display text-3xl font-bold text-foreground">Welcome back</h2>
-                <p className="mt-2 text-muted-foreground">Sign in to access your dashboard</p>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email address</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10 h-12"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
-                    <button
-                      type="button"
-                      onClick={() => setIsForgotPassword(true)}
-                      className="text-sm text-primary hover:underline"
-                    >
-                      Forgot password?
-                    </button>
-                  </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 h-12"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <Button type="submit" variant="hero" size="lg" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    'Sign in'
-                  )}
-                </Button>
-              </form>
-
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">
-                  Staff member?{' '}
-                  <Link to="/signup" className="text-primary font-medium hover:underline">
-                    Sign up here
-                  </Link>
-                </p>
-              </div>
-            </>
-          )}
+          {renderStep()}
         </div>
       </div>
     </div>
