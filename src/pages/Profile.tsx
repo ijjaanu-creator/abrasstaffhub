@@ -132,13 +132,24 @@ export default function Profile() {
         backgroundColor: null,
       });
 
-      // Capture back side
-      const backCanvas = await html2canvas(idCardBackRef.current, {
+      // Temporarily remove the rotateY transform for capturing the back side
+      const backElement = idCardBackRef.current;
+      const originalTransform = backElement.style.transform;
+      const originalVisibility = backElement.style.visibility;
+      backElement.style.transform = 'none';
+      backElement.style.visibility = 'visible';
+      
+      // Capture back side without the flip transform
+      const backCanvas = await html2canvas(backElement, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: null,
       });
+      
+      // Restore original transform
+      backElement.style.transform = originalTransform;
+      backElement.style.visibility = originalVisibility;
 
       // Download front
       const frontLink = document.createElement('a');
@@ -175,12 +186,24 @@ export default function Profile() {
         allowTaint: true,
         backgroundColor: '#ffffff',
       });
-      const backCanvas = await html2canvas(idCardBackRef.current, {
+      
+      // Temporarily remove the rotateY transform for capturing the back side
+      const backElement = idCardBackRef.current;
+      const originalTransform = backElement.style.transform;
+      const originalVisibility = backElement.style.visibility;
+      backElement.style.transform = 'none';
+      backElement.style.visibility = 'visible';
+      
+      const backCanvas = await html2canvas(backElement, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
       });
+      
+      // Restore original transform
+      backElement.style.transform = originalTransform;
+      backElement.style.visibility = originalVisibility;
 
       const front = frontCanvas.toDataURL('image/png');
       const back = backCanvas.toDataURL('image/png');
