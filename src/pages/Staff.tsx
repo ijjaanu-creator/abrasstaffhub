@@ -45,6 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { StaffDetailsDialog } from '@/components/staff/StaffDetailsDialog';
 
 export default function Staff() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -71,6 +72,9 @@ export default function Staff() {
 
   // Location dialog state
   const [selectedStaffForLocation, setSelectedStaffForLocation] = useState<any>(null);
+  
+  // Staff details dialog state
+  const [selectedStaffForDetails, setSelectedStaffForDetails] = useState<any>(null);
 
   const { data: staffMembers = [], isLoading } = useQuery({
     queryKey: ['staff-members'],
@@ -561,22 +565,32 @@ export default function Staff() {
         </DialogContent>
       </Dialog>
 
+      {/* Staff Details Dialog */}
+      <StaffDetailsDialog
+        open={!!selectedStaffForDetails}
+        onOpenChange={(open) => !open && setSelectedStaffForDetails(null)}
+        staff={selectedStaffForDetails}
+      />
+
       {/* Staff Grid */}
       <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {filteredStaff.map((staff: any, index: number) => (
           <div
             key={staff.id}
-            className={cn(
-              "group relative rounded-xl border border-border bg-card p-4 lg:p-6 shadow-elegant transition-all duration-300 hover:shadow-lg hover:border-primary/20 animate-fade-in",
-              staff.track_location && "cursor-pointer"
-            )}
+            className="group relative rounded-xl border border-border bg-card p-4 lg:p-6 shadow-elegant transition-all duration-300 hover:shadow-lg hover:border-primary/20 animate-fade-in cursor-pointer"
             style={{ animationDelay: `${(index + 2) * 50}ms` }}
-            onClick={() => staff.track_location && setSelectedStaffForLocation(staff)}
+            onClick={() => setSelectedStaffForDetails(staff)}
           >
             {/* Status Badge & Tracking Badge */}
             <div className="absolute right-3 top-3 lg:right-4 lg:top-4 flex items-center gap-2">
               {staff.track_location && (
-                <div className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium flex items-center gap-1">
+                <div 
+                  className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium flex items-center gap-1 hover:bg-primary/20 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedStaffForLocation(staff);
+                  }}
+                >
                   <MapPin className="h-3 w-3" />
                   GPS
                 </div>
@@ -600,23 +614,25 @@ export default function Staff() {
                   variant="ghost"
                   size="icon"
                   className="absolute right-10 top-2 lg:right-12 lg:top-3 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleEdit(staff)}>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(staff); }}>
                   Edit Details
                 </DropdownMenuItem>
                 <DropdownMenuItem 
-                  onClick={() => toggleStatusMutation.mutate({ id: staff.id, status: staff.status })}
+                  onClick={(e) => { e.stopPropagation(); toggleStatusMutation.mutate({ id: staff.id, status: staff.status }); }}
                   className={staff.status === 'active' ? 'text-destructive' : 'text-success'}
                 >
                   {staff.status === 'active' ? 'Deactivate' : 'Activate'}
                 </DropdownMenuItem>
                 {staff.status === 'inactive' && (
                   <DropdownMenuItem 
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       if (confirm(`Are you sure you want to permanently remove ${staff.name}? This action cannot be undone.`)) {
                         deleteStaffMutation.mutate(staff.id);
                       }

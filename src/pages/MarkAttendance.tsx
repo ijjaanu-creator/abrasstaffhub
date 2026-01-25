@@ -255,8 +255,8 @@ export default function MarkAttendance() {
       queryClient.invalidateQueries({ queryKey: ['my-attendance-today'] });
       toast({ title: 'Checked in successfully!' });
       
-      // Start location tracking for Executive staff
-      if (staffMember?.department === 'Executive' && data?.id) {
+      // Start location tracking for staff with track_location enabled
+      if (staffMember?.track_location && data?.id) {
         startTracking({
           staffId: staffMember.id,
           attendanceId: data.id,
@@ -278,17 +278,17 @@ export default function MarkAttendance() {
       queryClient.invalidateQueries({ queryKey: ['my-attendance-today'] });
       toast({ title: 'Checked out successfully!' });
       
-      // Stop location tracking for Executive staff
-      if (staffMember?.department === 'Executive') {
+      // Stop location tracking for staff with track_location enabled
+      if (staffMember?.track_location) {
         stopTracking();
       }
     },
   });
 
-  // Resume tracking if Executive staff is already checked in (page refresh)
+  // Resume tracking if staff with track_location enabled is already checked in (page refresh)
   useEffect(() => {
     if (
-      staffMember?.department === 'Executive' &&
+      staffMember?.track_location &&
       todayAttendance?.check_in &&
       !todayAttendance?.check_out &&
       !isTracking
