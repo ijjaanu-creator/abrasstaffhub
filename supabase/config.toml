@@ -1,7 +1,1 @@
-project_id = "yueajtfynoszalboqunl"
-
-[functions.verify-face]
-verify_jwt = false
-
-[functions.app-assistant]
-verify_jwt = false
+project_id = "pvcaqkfeyvlluytqlhft"
