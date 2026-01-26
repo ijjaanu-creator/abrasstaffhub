@@ -21,6 +21,7 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
         navigateFallback: "index.html",
         navigateFallbackDenylist: [/^\/api/, /^\/supabase/],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB limit for large PWA icons
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
