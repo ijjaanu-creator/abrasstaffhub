@@ -18,6 +18,29 @@ export function useLocationTracking() {
   const lastRecordedAtRef = useRef<number>(0);
   const hasShownErrorRef = useRef(false);
   const isRecordingRef = useRef(false);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+
+  // Request Wake Lock to prevent device from sleeping
+  const requestWakeLock = useCallback(async () => {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+        wakeLockRef.current?.addEventListener('release', () => {
+          console.log('Wake Lock released');
+        });
+        console.log('Wake Lock acquired');
+      }
+    } catch (err) {
+      console.log('Wake Lock not available or denied:', err);
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(() => {
+    if (wakeLockRef.current) {
+      wakeLockRef.current.release();
+      wakeLockRef.current = null;
+    }
+  }, []);
 
   const recordLocation = useCallback(async (position: GeolocationPosition) => {
     if (!optionsRef.current) return;
@@ -29,6 +52,12 @@ export function useLocationTracking() {
     // Skip if accuracy is too poor (>500m)
     if (accuracy > 500) {
       console.log('Skipping location record - accuracy too poor:', accuracy);
+      return;
+    }
+
+    // Validate coordinates are reasonable
+    if (latitude === 0 && longitude === 0) {
+      console.log('Skipping invalid coordinates (0,0)');
       return;
     }
 
@@ -90,10 +119,41 @@ export function useLocationTracking() {
       watchIdRef.current = null;
     }
 
+    releaseWakeLock();
     optionsRef.current = null;
     setIsTracking(false);
     console.log('Location tracking stopped');
-  }, []);
+  }, [releaseWakeLock]);
+
+  // Re-acquire wake lock and force a fresh location read when page becomes visible again
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && optionsRef.current && isTracking) {
+        console.log('Page became visible, forcing fresh location read');
+        
+        // Re-acquire wake lock (released when page was hidden)
+        requestWakeLock();
+
+        // Force an immediate fresh location read
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            // Reset throttle so the fresh position is recorded immediately
+            lastRecordedAtRef.current = 0;
+            recordLocation(pos);
+          },
+          (error) => console.log('Visibility resume position error:', error.message),
+          {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0,
+          }
+        );
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isTracking, recordLocation, requestWakeLock]);
 
   const startTracking = useCallback(
     async (options: LocationTrackingOptions): Promise<boolean> => {
@@ -123,6 +183,9 @@ export function useLocationTracking() {
       hasShownErrorRef.current = false;
       lastRecordedAtRef.current = 0;
       optionsRef.current = options;
+
+      // Request wake lock to keep device awake
+      await requestWakeLock();
 
       return await new Promise<boolean>((resolve) => {
         let resolved = false;
@@ -170,7 +233,7 @@ export function useLocationTracking() {
 
           toast({
             title: 'Location tracking started',
-            description: 'Your location is being tracked while checked in.',
+            description: 'Your location is being tracked while checked in. Keep this page open.',
           });
 
           resolve(true);
@@ -196,6 +259,7 @@ export function useLocationTracking() {
             description: message,
             variant: 'destructive',
           });
+          releaseWakeLock();
           resolve(false);
         };
 
@@ -231,12 +295,13 @@ export function useLocationTracking() {
               description: 'Could not get location. Please check GPS settings.',
               variant: 'destructive',
             });
+            releaseWakeLock();
             resolve(false);
           }
         }, 20000);
       });
     },
-    [isTracking, recordLocation, stopTracking, toast]
+    [isTracking, recordLocation, stopTracking, toast, requestWakeLock, releaseWakeLock]
   );
 
   // Cleanup on unmount

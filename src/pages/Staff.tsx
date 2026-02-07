@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -525,34 +525,49 @@ export default function Staff() {
           </DialogHeader>
           <div className="space-y-4">
             {staffLocation ? (
-              <>
-                <div className="relative h-64 rounded-lg overflow-hidden border bg-muted">
-                  <iframe
-                    key={`${staffLocation.latitude}-${staffLocation.longitude}-${staffLocation.recorded_at}`}
-                    title="Staff location map"
-                    className="absolute inset-0 h-full w-full border-0"
-                    loading="lazy"
-                    allowFullScreen
-                    referrerPolicy="no-referrer-when-downgrade"
-                    src={`https://www.google.com/maps?q=${staffLocation.latitude},${staffLocation.longitude}&z=17&output=embed`}
-                  />
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    Last updated: {new Date(staffLocation.recorded_at).toLocaleString()}
-                  </span>
-                  <Button asChild variant="outline" size="sm" className="gap-2">
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${staffLocation.latitude},${staffLocation.longitude}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <MapPin className="h-4 w-4" />
-                      Open in Maps
-                    </a>
-                  </Button>
-                </div>
-              </>
+              (() => {
+                const minutesAgo = Math.round((Date.now() - new Date(staffLocation.recorded_at).getTime()) / 60000);
+                const isStale = minutesAgo > 2;
+                const stalenessLabel = minutesAgo < 1 ? 'Just now' : minutesAgo < 60 ? `${minutesAgo} min ago` : `${Math.round(minutesAgo / 60)}h ago`;
+                return (
+                  <>
+                    {isStale && (
+                      <div className="rounded-lg bg-warning/10 border border-warning/20 p-3 text-sm text-warning flex items-center gap-2">
+                        <Clock className="h-4 w-4 flex-shrink-0" />
+                        <span>
+                          Location data is <strong>{stalenessLabel}</strong>. Staff may have left the app or their phone went to sleep. Ask them to reopen the attendance page.
+                        </span>
+                      </div>
+                    )}
+                    <div className="relative h-64 rounded-lg overflow-hidden border bg-muted">
+                      <iframe
+                        key={`${staffLocation.latitude}-${staffLocation.longitude}-${staffLocation.recorded_at}`}
+                        title="Staff location map"
+                        className="absolute inset-0 h-full w-full border-0"
+                        loading="lazy"
+                        allowFullScreen
+                        referrerPolicy="no-referrer-when-downgrade"
+                        src={`https://www.google.com/maps?q=${staffLocation.latitude},${staffLocation.longitude}&z=17&output=embed`}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className={isStale ? 'text-warning font-medium' : 'text-success font-medium'}>
+                        {isStale ? '⚠' : '●'} {stalenessLabel}
+                      </span>
+                      <Button asChild variant="outline" size="sm" className="gap-2">
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${staffLocation.latitude},${staffLocation.longitude}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <MapPin className="h-4 w-4" />
+                          Open in Maps
+                        </a>
+                      </Button>
+                    </div>
+                  </>
+                );
+              })()
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <MapPin className="h-12 w-12 text-muted-foreground/50 mb-4" />
