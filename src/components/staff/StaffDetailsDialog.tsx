@@ -100,6 +100,19 @@ export function StaffDetailsDialog({ open, onOpenChange, staff }: StaffDetailsDi
     enabled: !!staff?.id && open,
   });
 
+  // Fetch app settings for overtime toggle & rate (must be before any early return to respect Rules of Hooks)
+  const { data: appSettingsData } = useQuery({
+    queryKey: ['appSettings-overtime'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('overtime_rate, enable_overtime')
+        .limit(1)
+        .maybeSingle();
+      return data as { overtime_rate: number | null; enable_overtime: boolean | null } | null;
+    },
+  });
+
   if (!staff) return null;
 
   // Calculate shift duration in hours
@@ -143,18 +156,6 @@ export function StaffDetailsDialog({ open, onOpenChange, staff }: StaffDetailsDi
   const workingDaysInMonth = 26; // Assuming 26 working days
   const dailyRate = staff.salary / workingDaysInMonth;
   const hourlyRate = dailyRate / expectedHoursPerDay;
-  // Fetch app settings for overtime toggle & rate
-  const { data: appSettingsData } = useQuery({
-    queryKey: ['appSettings-overtime'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('app_settings')
-        .select('overtime_rate, enable_overtime')
-        .limit(1)
-        .maybeSingle();
-      return data as { overtime_rate: number | null; enable_overtime: boolean | null } | null;
-    },
-  });
 
   const enableOvertime = appSettingsData?.enable_overtime ?? true;
   const overtimeMultiplier = appSettingsData?.overtime_rate ?? 1.5;
