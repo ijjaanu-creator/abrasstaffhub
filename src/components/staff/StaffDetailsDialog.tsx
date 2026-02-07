@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -143,10 +143,25 @@ export function StaffDetailsDialog({ open, onOpenChange, staff }: StaffDetailsDi
   const workingDaysInMonth = 26; // Assuming 26 working days
   const dailyRate = staff.salary / workingDaysInMonth;
   const hourlyRate = dailyRate / expectedHoursPerDay;
-  const overtimeRate = hourlyRate * 1.5; // 1.5x for overtime
+  // Fetch app settings for overtime toggle & rate
+  const { data: appSettingsData } = useQuery({
+    queryKey: ['appSettings-overtime'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('overtime_rate, enable_overtime')
+        .limit(1)
+        .maybeSingle();
+      return data as { overtime_rate: number | null; enable_overtime: boolean | null } | null;
+    },
+  });
+
+  const enableOvertime = appSettingsData?.enable_overtime ?? true;
+  const overtimeMultiplier = appSettingsData?.overtime_rate ?? 1.5;
+  const overtimeRate = enableOvertime ? hourlyRate * overtimeMultiplier : 0;
 
   const basePay = (presentDays + lateDays) * dailyRate;
-  const overtimePay = totalOvertimeHours * overtimeRate;
+  const overtimePay = enableOvertime ? totalOvertimeHours * overtimeRate : 0;
   const lateDeduction = lateDays * (dailyRate * 0.1); // 10% deduction per late day
   const absentDeduction = absentDays * dailyRate;
   const lossTimeDeduction = totalLossHours * hourlyRate;
