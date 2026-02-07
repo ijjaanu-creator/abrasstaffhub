@@ -244,7 +244,7 @@ export default function Staff() {
       return data;
     },
     enabled: !!selectedStaffForLocation?.id,
-    refetchInterval: 10000, // Refresh every 10 seconds
+    refetchInterval: 5000, // Refresh every 5 seconds for more accurate live tracking
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -528,12 +528,13 @@ export default function Staff() {
               <>
                 <div className="relative h-64 rounded-lg overflow-hidden border bg-muted">
                   <iframe
+                    key={`${staffLocation.latitude}-${staffLocation.longitude}-${staffLocation.recorded_at}`}
                     title="Staff location map"
                     className="absolute inset-0 h-full w-full border-0"
                     loading="lazy"
                     allowFullScreen
                     referrerPolicy="no-referrer-when-downgrade"
-                    src={`https://www.google.com/maps?q=${staffLocation.latitude},${staffLocation.longitude}&z=15&output=embed`}
+                    src={`https://www.google.com/maps?q=${staffLocation.latitude},${staffLocation.longitude}&z=17&output=embed`}
                   />
                 </div>
                 <div className="flex items-center justify-between text-sm">

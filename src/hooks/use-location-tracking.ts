@@ -150,7 +150,7 @@ export function useLocationTracking() {
             },
             {
               enableHighAccuracy: true,
-              maximumAge: 10000,
+              maximumAge: 0,
               timeout: 30000,
             }
           );
@@ -163,7 +163,7 @@ export function useLocationTracking() {
               {
                 enableHighAccuracy: true,
                 timeout: 15000,
-                maximumAge: 5000,
+                maximumAge: 0,
               }
             );
           }, TRACKING_INTERVAL_MS);
@@ -211,14 +211,14 @@ export function useLocationTracking() {
               {
                 enableHighAccuracy: false,
                 timeout: 10000,
-                maximumAge: 60000,
+                maximumAge: 0,
               }
             );
           },
           {
             enableHighAccuracy: true,
             timeout: 10000,
-            maximumAge: 10000,
+            maximumAge: 0,
           }
         );
 
