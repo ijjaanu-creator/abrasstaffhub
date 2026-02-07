@@ -236,11 +236,33 @@ export default function MarkAttendance() {
     setShowFaceCapture(true);
   };
 
+  // Fetch app settings for late threshold
+  const { data: appSettings } = useQuery({
+    queryKey: ['appSettings-for-attendance'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('work_start_time, late_threshold')
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+
   const checkInMutation = useMutation({
     mutationFn: async () => {
       const now = new Date();
       const checkInTime = format(now, 'HH:mm');
-      const isLate = now.getHours() >= 9;
+      
+      // Determine late status using staff's shift_start + late_threshold from settings
+      const shiftStart = staffMember?.shift_start?.slice(0, 5) || appSettings?.work_start_time?.slice(0, 5) || '09:00';
+      const lateThreshold = appSettings?.late_threshold ?? 15;
+      
+      const [startH, startM] = shiftStart.split(':').map(Number);
+      const lateDeadline = new Date(now);
+      lateDeadline.setHours(startH, startM + lateThreshold, 0, 0);
+      
+      const isLate = now > lateDeadline;
       
       const { data, error } = await supabase.from('attendance_records').insert({
         staff_id: staffMember?.id,
