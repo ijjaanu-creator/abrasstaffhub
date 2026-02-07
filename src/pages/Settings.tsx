@@ -258,6 +258,7 @@ export default function Settings() {
     halfDayHours: 4,
     fullDayHours: 8,
     overtimeRate: 1.5,
+    enableOvertime: true,
     enableNotifications: true,
     enableEmailAlerts: false,
     enableAutoCheckout: true,
@@ -275,6 +276,7 @@ export default function Settings() {
         halfDayHours: savedSettings.half_day_hours ?? 4,
         fullDayHours: savedSettings.full_day_hours ?? 8,
         overtimeRate: savedSettings.overtime_rate ?? 1.5,
+        enableOvertime: (savedSettings as any).enable_overtime ?? true,
         enableNotifications: savedSettings.enable_notifications ?? true,
         enableEmailAlerts: savedSettings.enable_email_alerts ?? false,
         enableAutoCheckout: savedSettings.enable_auto_checkout ?? true,
@@ -297,6 +299,7 @@ export default function Settings() {
         half_day_hours: settings.halfDayHours,
         full_day_hours: settings.fullDayHours,
         overtime_rate: settings.overtimeRate,
+        enable_overtime: settings.enableOvertime,
         enable_notifications: settings.enableNotifications,
         enable_email_alerts: settings.enableEmailAlerts,
         enable_auto_checkout: settings.enableAutoCheckout,
@@ -445,18 +448,34 @@ export default function Settings() {
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="overtimeRate">Overtime Rate (multiplier)</Label>
-              <Input
-                id="overtimeRate"
-                type="number"
-                step="0.1"
-                value={settings.overtimeRate}
-                onChange={(e) => setSettings({ ...settings, overtimeRate: parseFloat(e.target.value) || 1 })}
-              />
-              <p className="text-xs text-muted-foreground">
-                Multiplier applied to hourly rate for overtime calculation
-              </p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Overtime Rate Multiplier</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Apply a multiplier to hourly rate for overtime calculation
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.enableOvertime}
+                  onCheckedChange={(checked) => setSettings({ ...settings, enableOvertime: checked })}
+                />
+              </div>
+              {settings.enableOvertime && (
+                <div className="space-y-2">
+                  <Label htmlFor="overtimeRate">Rate Multiplier</Label>
+                  <Input
+                    id="overtimeRate"
+                    type="number"
+                    step="0.1"
+                    value={settings.overtimeRate}
+                    onChange={(e) => setSettings({ ...settings, overtimeRate: parseFloat(e.target.value) || 1 })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    e.g. 1.5 means 1.5× the regular hourly rate
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

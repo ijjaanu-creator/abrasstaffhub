@@ -46,6 +46,7 @@ export type Database = {
           enable_auto_checkout: boolean | null
           enable_email_alerts: boolean | null
           enable_notifications: boolean | null
+          enable_overtime: boolean
           full_day_hours: number | null
           half_day_hours: number | null
           id: string
@@ -63,6 +64,7 @@ export type Database = {
           enable_auto_checkout?: boolean | null
           enable_email_alerts?: boolean | null
           enable_notifications?: boolean | null
+          enable_overtime?: boolean
           full_day_hours?: number | null
           half_day_hours?: number | null
           id?: string
@@ -80,6 +82,7 @@ export type Database = {
           enable_auto_checkout?: boolean | null
           enable_email_alerts?: boolean | null
           enable_notifications?: boolean | null
+          enable_overtime?: boolean
           full_day_hours?: number | null
           half_day_hours?: number | null
           id?: string

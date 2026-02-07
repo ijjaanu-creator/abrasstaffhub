@@ -1,0 +1,1 @@
+ALTER TABLE public.app_settings ADD COLUMN enable_overtime boolean NOT NULL DEFAULT true;
