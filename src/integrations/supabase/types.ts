@@ -459,6 +459,7 @@ export type Database = {
       }
       staff_members: {
         Row: {
+          additional_jobs: string[] | null
           address: string | null
           biometric_credential_id: string | null
           biometric_enrolled_at: string | null
@@ -483,6 +484,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          additional_jobs?: string[] | null
           address?: string | null
           biometric_credential_id?: string | null
           biometric_enrolled_at?: string | null
@@ -507,6 +509,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          additional_jobs?: string[] | null
           address?: string | null
           biometric_credential_id?: string | null
           biometric_enrolled_at?: string | null

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import {
   Search,
@@ -68,6 +69,7 @@ export default function Staff() {
     track_location: false,
     date_of_birth: '',
     address: '',
+    additional_jobs: '' as string,
   });
 
   // Location dialog state
@@ -103,6 +105,9 @@ export default function Staff() {
 
   const addStaffMutation = useMutation({
     mutationFn: async (staffData: typeof formData) => {
+      const additionalJobsArray = staffData.additional_jobs
+        ? staffData.additional_jobs.split(',').map(j => j.trim()).filter(Boolean)
+        : [];
       const { error } = await supabase.from('staff_members').insert({
         name: staffData.name,
         email: staffData.email || null,
@@ -116,6 +121,7 @@ export default function Staff() {
         track_location: staffData.track_location,
         date_of_birth: staffData.date_of_birth || null,
         address: staffData.address || null,
+        additional_jobs: additionalJobsArray,
       });
       if (error) throw error;
     },
@@ -132,6 +138,9 @@ export default function Staff() {
 
   const updateStaffMutation = useMutation({
     mutationFn: async ({ id, ...staffData }: typeof formData & { id: string }) => {
+      const additionalJobsArray = staffData.additional_jobs
+        ? staffData.additional_jobs.split(',').map(j => j.trim()).filter(Boolean)
+        : [];
       const { error } = await supabase
         .from('staff_members')
         .update({
@@ -147,6 +156,7 @@ export default function Staff() {
           track_location: staffData.track_location,
           date_of_birth: staffData.date_of_birth || null,
           address: staffData.address || null,
+          additional_jobs: additionalJobsArray,
         })
         .eq('id', id);
       if (error) throw error;
@@ -207,6 +217,7 @@ export default function Staff() {
       track_location: false,
       date_of_birth: '',
       address: '',
+      additional_jobs: '',
     });
   };
 
@@ -224,6 +235,7 @@ export default function Staff() {
       track_location: staff.track_location || false,
       date_of_birth: staff.date_of_birth || '',
       address: staff.address || '',
+      additional_jobs: (staff.additional_jobs || []).join(', '),
     });
     setEditingStaff(staff);
   };
@@ -418,6 +430,22 @@ export default function Staff() {
             required
           />
         </div>
+      </div>
+
+      {/* Additional Jobs */}
+      <div className="space-y-2">
+        <Label htmlFor="additional_jobs">Additional Jobs</Label>
+        <Input
+          id="additional_jobs"
+          name="additional_jobs"
+          value={formData.additional_jobs}
+          onChange={(e) => setFormData((prev) => ({ ...prev, additional_jobs: e.target.value }))}
+          placeholder="e.g. Driver, Cleaner, Packer"
+          autoComplete="off"
+        />
+        <p className="text-xs text-muted-foreground">
+          Separate multiple jobs with commas. This is optional.
+        </p>
       </div>
 
       {/* Location Tracking Toggle */}
@@ -698,6 +726,15 @@ export default function Staff() {
                 <Clock className="h-4 w-4 flex-shrink-0" />
                 <span>Shift: {staff.shift_start?.slice(0, 5) || '09:00'} - {staff.shift_end?.slice(0, 5) || '17:00'}</span>
               </div>
+              {staff.additional_jobs && staff.additional_jobs.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {staff.additional_jobs.map((job: string, i: number) => (
+                    <Badge key={i} variant="secondary" className="text-xs">
+                      {job}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Salary */}
