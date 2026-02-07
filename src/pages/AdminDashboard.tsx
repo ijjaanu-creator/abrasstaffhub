@@ -3,6 +3,7 @@ import { StatsCard } from '@/components/dashboard/StatsCard';
 import { AttendanceOverview } from '@/components/dashboard/AttendanceOverview';
 import { PayrollSummary } from '@/components/dashboard/PayrollSummary';
 import { FaceReregistrationRequests } from '@/components/dashboard/FaceReregistrationRequests';
+import { SendPushNotification } from '@/components/dashboard/SendPushNotification';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Users, UserCheck, UserX, Clock, Wallet, IndianRupee } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -103,10 +104,13 @@ export default function AdminDashboard() {
         />
       </div>
 
-      {/* Face Re-registration Requests */}
-      <div className="animate-fade-in delay-100">
+      {/* Face Re-registration Requests & Push Notifications */}
+      <div className="grid gap-6 lg:grid-cols-2 animate-fade-in delay-100">
         <ErrorBoundary>
           <FaceReregistrationRequests />
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <SendPushNotification />
         </ErrorBoundary>
       </div>
 

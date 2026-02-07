@@ -6,82 +6,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// Convert VAPID key from URL-safe base64 to Uint8Array
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; i++) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
-
-// Import crypto key from raw bytes
-async function importVapidKey(privateKeyBase64: string): Promise<CryptoKey> {
-  const rawKey = urlBase64ToUint8Array(privateKeyBase64);
-  return await crypto.subtle.importKey(
-    'pkcs8',
-    rawKey,
-    { name: 'ECDSA', namedCurve: 'P-256' },
-    false,
-    ['sign']
-  );
-}
-
-// Create JWT for VAPID authentication
-async function createVapidJwt(endpoint: string, subject: string, privateKeyBase64: string, publicKeyBase64: string): Promise<{ authorization: string; cryptoKey: string }> {
-  const audience = new URL(endpoint).origin;
-  
-  const header = { typ: 'JWT', alg: 'ES256' };
-  const payload = {
-    aud: audience,
-    exp: Math.floor(Date.now() / 1000) + (12 * 60 * 60), // 12 hours
-    sub: subject,
-  };
-
-  const encodedHeader = btoa(JSON.stringify(header)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const encodedPayload = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  
-  const unsignedToken = `${encodedHeader}.${encodedPayload}`;
-  
-  // Import the private key for signing
-  const rawKey = urlBase64ToUint8Array(privateKeyBase64);
-  
-  // The VAPID private key is a raw 32-byte key, import as JWK
-  const jwk = {
-    kty: 'EC',
-    crv: 'P-256',
-    d: privateKeyBase64,
-    x: '', // Will be derived
-    y: '', // Will be derived
-  };
-  
-  // For web push, we need to use the web-push compatible approach
-  // Instead of complex crypto, let's use a simpler HTTP approach
-  
-  return {
-    authorization: `vapid t=${unsignedToken}, k=${publicKeyBase64}`,
-    cryptoKey: `p256ecdsa=${publicKeyBase64}`,
-  };
-}
-
-// Send a web push notification using fetch
+// Send a web push notification
 async function sendPushNotification(
   subscription: { endpoint: string; p256dh: string; auth: string },
-  payload: string,
   vapidPublicKey: string,
   vapidPrivateKey: string,
   vapidSubject: string
 ): Promise<Response> {
-  // For web push, we need proper VAPID + encryption
-  // Since Deno doesn't have a native web-push library, we'll use a simpler approach
-  // by calling the push service endpoint with the proper headers
-  
   const audience = new URL(subscription.endpoint).origin;
   
-  // Create a minimal VAPID token
   const header = btoa(JSON.stringify({ typ: 'JWT', alg: 'ES256' }))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const now = Math.floor(Date.now() / 1000);
@@ -91,66 +24,62 @@ async function sendPushNotification(
     sub: vapidSubject,
   })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   
-  // Import VAPID private key as JWK for ECDSA signing
-  const jwk = {
+  // Build JWK from VAPID keys
+  const padding = '='.repeat((4 - vapidPublicKey.length % 4) % 4);
+  const base64 = (vapidPublicKey + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const pubKeyBytes = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) {
+    pubKeyBytes[i] = rawData.charCodeAt(i);
+  }
+  
+  const jwk: any = {
     kty: 'EC',
     crv: 'P-256',
     d: vapidPrivateKey,
   };
   
-  // We need x and y coordinates from the public key
-  const pubKeyBytes = urlBase64ToUint8Array(vapidPublicKey);
   // Public key is 65 bytes: 0x04 + 32 bytes x + 32 bytes y
   if (pubKeyBytes.length === 65 && pubKeyBytes[0] === 0x04) {
     const xBytes = pubKeyBytes.slice(1, 33);
     const yBytes = pubKeyBytes.slice(33, 65);
-    (jwk as any).x = btoa(String.fromCharCode(...xBytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    (jwk as any).y = btoa(String.fromCharCode(...yBytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    jwk.x = btoa(String.fromCharCode(...xBytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    jwk.y = btoa(String.fromCharCode(...yBytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
   
-  let signature = '';
-  try {
-    const key = await crypto.subtle.importKey(
-      'jwk',
-      jwk,
-      { name: 'ECDSA', namedCurve: 'P-256' },
-      false,
-      ['sign']
-    );
-    
-    const unsignedToken = `${header}.${claims}`;
-    const encoder = new TextEncoder();
-    const sigBytes = await crypto.subtle.sign(
-      { name: 'ECDSA', hash: 'SHA-256' },
-      key,
-      encoder.encode(unsignedToken)
-    );
-    
-    // Convert DER signature to raw r||s format if needed, or just base64url encode
-    const sigArray = new Uint8Array(sigBytes);
-    signature = btoa(String.fromCharCode(...sigArray))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    
-    const jwt = `${unsignedToken}.${signature}`;
-    
-    // For encrypted payload, we need proper content encryption
-    // For now, send without payload body (notification data is in the push event)
-    // The simplest approach: send a push with TTL and VAPID, no encrypted body
-    const response = await fetch(subscription.endpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `vapid t=${jwt}, k=${vapidPublicKey}`,
-        'TTL': '86400',
-        'Content-Length': '0',
-        'Urgency': 'normal',
-      },
-    });
-    
-    return response;
-  } catch (err) {
-    console.error('Error signing VAPID JWT:', err);
-    throw err;
-  }
+  const key = await crypto.subtle.importKey(
+    'jwk',
+    jwk,
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['sign']
+  );
+  
+  const unsignedToken = `${header}.${claims}`;
+  const encoder = new TextEncoder();
+  const sigBytes = await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-256' },
+    key,
+    encoder.encode(unsignedToken)
+  );
+  
+  const sigArray = new Uint8Array(sigBytes);
+  const signature = btoa(String.fromCharCode(...sigArray))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  
+  const jwt = `${unsignedToken}.${signature}`;
+  
+  const response = await fetch(subscription.endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': `vapid t=${jwt}, k=${vapidPublicKey}`,
+      'TTL': '86400',
+      'Content-Length': '0',
+      'Urgency': 'normal',
+    },
+  });
+  
+  return response;
 }
 
 serve(async (req) => {
@@ -177,69 +106,111 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get today's date in YYYY-MM-DD format
-    const today = new Date().toISOString().split('T')[0];
-
-    // Find staff who are checked in today (have check_in but no check_out) AND have track_location enabled
-    const { data: activeAttendance, error: attendanceError } = await supabase
-      .from('attendance_records')
-      .select('staff_id')
-      .eq('date', today)
-      .not('check_in', 'is', null)
-      .is('check_out', null);
-
-    if (attendanceError) {
-      console.error('Error fetching attendance:', attendanceError);
-      throw attendanceError;
+    // Parse request body for test mode
+    let isTestMode = false;
+    let customTitle = 'Abras Staff Hub';
+    let customMessage = 'Open the app to keep your location updated 📍';
+    
+    try {
+      const body = await req.json();
+      if (body?.test === true) {
+        isTestMode = true;
+        // Verify admin role if test mode (manual trigger)
+        const authHeader = req.headers.get('Authorization');
+        if (authHeader?.startsWith('Bearer ')) {
+          const token = authHeader.replace('Bearer ', '');
+          const { data: claimsData, error: claimsError } = await supabase.auth.getUser(token);
+          if (claimsError || !claimsData?.user) {
+            return new Response(
+              JSON.stringify({ error: 'Unauthorized' }),
+              { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          // Check admin role
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', claimsData.user.id)
+            .eq('role', 'admin')
+            .maybeSingle();
+          
+          if (!roleData) {
+            return new Response(
+              JSON.stringify({ error: 'Admin access required' }),
+              { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
+        if (body?.title) customTitle = body.title;
+        if (body?.message) customMessage = body.message;
+        console.log('Test mode: sending to ALL subscriptions');
+      }
+    } catch {
+      // No body or not JSON, continue with normal mode
     }
 
-    if (!activeAttendance || activeAttendance.length === 0) {
-      console.log('No active check-ins found');
-      return new Response(
-        JSON.stringify({ message: 'No active check-ins', sent: 0 }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    let subscriptions;
 
-    const staffIds = activeAttendance.map(a => a.staff_id);
-    console.log(`Found ${staffIds.length} checked-in staff`);
+    if (isTestMode) {
+      // Test mode: send to ALL subscriptions
+      const { data, error } = await supabase
+        .from('push_subscriptions')
+        .select('*');
+      
+      if (error) throw error;
+      subscriptions = data;
+    } else {
+      // Normal mode: only send to checked-in tracked staff
+      const today = new Date().toISOString().split('T')[0];
 
-    // Filter for staff with track_location enabled
-    const { data: trackedStaff, error: staffError } = await supabase
-      .from('staff_members')
-      .select('id')
-      .in('id', staffIds)
-      .eq('track_location', true);
+      const { data: activeAttendance, error: attendanceError } = await supabase
+        .from('attendance_records')
+        .select('staff_id')
+        .eq('date', today)
+        .not('check_in', 'is', null)
+        .is('check_out', null);
 
-    if (staffError) {
-      console.error('Error fetching staff:', staffError);
-      throw staffError;
-    }
+      if (attendanceError) throw attendanceError;
 
-    if (!trackedStaff || trackedStaff.length === 0) {
-      console.log('No tracked staff found among checked-in staff');
-      return new Response(
-        JSON.stringify({ message: 'No tracked staff checked in', sent: 0 }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+      if (!activeAttendance || activeAttendance.length === 0) {
+        console.log('No active check-ins found');
+        return new Response(
+          JSON.stringify({ message: 'No active check-ins', sent: 0 }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-    const trackedStaffIds = trackedStaff.map(s => s.id);
-    console.log(`Found ${trackedStaffIds.length} tracked staff`);
+      const staffIds = activeAttendance.map(a => a.staff_id);
 
-    // Get push subscriptions for these staff members
-    const { data: subscriptions, error: subError } = await supabase
-      .from('push_subscriptions')
-      .select('*')
-      .in('staff_id', trackedStaffIds);
+      const { data: trackedStaff, error: staffError } = await supabase
+        .from('staff_members')
+        .select('id')
+        .in('id', staffIds)
+        .eq('track_location', true);
 
-    if (subError) {
-      console.error('Error fetching subscriptions:', subError);
-      throw subError;
+      if (staffError) throw staffError;
+
+      if (!trackedStaff || trackedStaff.length === 0) {
+        console.log('No tracked staff found among checked-in staff');
+        return new Response(
+          JSON.stringify({ message: 'No tracked staff checked in', sent: 0 }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const trackedStaffIds = trackedStaff.map(s => s.id);
+
+      const { data, error: subError } = await supabase
+        .from('push_subscriptions')
+        .select('*')
+        .in('staff_id', trackedStaffIds);
+
+      if (subError) throw subError;
+      subscriptions = data;
     }
 
     if (!subscriptions || subscriptions.length === 0) {
-      console.log('No push subscriptions found for tracked staff');
+      console.log('No push subscriptions found');
       return new Response(
         JSON.stringify({ message: 'No subscriptions found', sent: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -252,16 +223,10 @@ serve(async (req) => {
     let failed = 0;
     const expiredSubscriptions: string[] = [];
 
-    // Send notification to each subscription
     for (const sub of subscriptions) {
       try {
         const response = await sendPushNotification(
           { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
-          JSON.stringify({
-            title: 'Abras Staff Hub',
-            body: 'Open the app to keep your location updated 📍',
-            icon: '/pwa-192x192.png',
-          }),
           vapidPublicKey,
           vapidPrivateKey,
           vapidSubject
@@ -271,14 +236,12 @@ serve(async (req) => {
           sent++;
           console.log(`Notification sent to staff ${sub.staff_id}`);
         } else if (response.status === 404 || response.status === 410) {
-          // Subscription expired or invalid
           console.log(`Subscription expired for staff ${sub.staff_id}, marking for cleanup`);
           expiredSubscriptions.push(sub.id);
           failed++;
         } else {
-          console.error(`Failed to send to staff ${sub.staff_id}: ${response.status} ${response.statusText}`);
           const body = await response.text();
-          console.error('Response body:', body);
+          console.error(`Failed to send to staff ${sub.staff_id}: ${response.status} - ${body}`);
           failed++;
         }
       } catch (err) {
@@ -290,14 +253,10 @@ serve(async (req) => {
     // Clean up expired subscriptions
     if (expiredSubscriptions.length > 0) {
       console.log(`Cleaning up ${expiredSubscriptions.length} expired subscriptions`);
-      const { error: deleteError } = await supabase
+      await supabase
         .from('push_subscriptions')
         .delete()
         .in('id', expiredSubscriptions);
-      
-      if (deleteError) {
-        console.error('Error cleaning up subscriptions:', deleteError);
-      }
     }
 
     console.log(`Done. Sent: ${sent}, Failed: ${failed}, Cleaned: ${expiredSubscriptions.length}`);
