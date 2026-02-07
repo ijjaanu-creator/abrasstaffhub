@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useFaceAuth } from '@/hooks/use-face-auth';
 import { useGeofence } from '@/hooks/use-geofence';
 import { useLocationTracking } from '@/hooks/use-location-tracking';
+import { usePushNotifications } from '@/hooks/use-push-notifications';
 import { FaceCapture } from '@/components/FaceCapture';
 import { Camera, CheckCircle, Loader2, ScanFace, MapPin, Clock, Send } from 'lucide-react';
 import { format } from 'date-fns';
@@ -27,6 +28,7 @@ export default function MarkAttendance() {
   const { enrollFace, verifyFace, isEnrolling, isVerifying } = useFaceAuth();
   const { checkLocation, isChecking: isCheckingLocation, maxDistance, currentDistance, isWithinGeofence } = useGeofence();
   const { startTracking, stopTracking, isTracking } = useLocationTracking();
+  const { requestPermissionAndSubscribe } = usePushNotifications();
   const today = format(new Date(), 'yyyy-MM-dd');
 
   const [showFaceCapture, setShowFaceCapture] = useState(false);
@@ -283,6 +285,11 @@ export default function MarkAttendance() {
           staffId: staffMember.id,
           attendanceId: data.id,
         });
+        
+        // Request push notification permission for location tracking reminders
+        if (user?.id) {
+          requestPermissionAndSubscribe(staffMember.id, user.id);
+        }
       }
     },
   });

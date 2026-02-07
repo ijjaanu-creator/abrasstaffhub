@@ -2,3 +2,9 @@ project_id = "pvcaqkfeyvlluytqlhft"
 
 [functions.email-hook]
 verify_jwt = false
+
+[functions.get-vapid-key]
+verify_jwt = false
+
+[functions.send-tracking-reminder]
+verify_jwt = false
