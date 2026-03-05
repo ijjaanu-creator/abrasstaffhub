@@ -131,6 +131,7 @@ export function StaffDetailsDialog({ open, onOpenChange, staff }: StaffDetailsDi
   const presentDays = attendanceRecords.filter(r => r.status === 'present').length;
   const absentDays = attendanceRecords.filter(r => r.status === 'absent').length;
   const lateDays = attendanceRecords.filter(r => r.status === 'late').length;
+  const holidayDays = attendanceRecords.filter(r => r.status === 'holiday').length;
 
   // Calculate total work hours and overtime
   let totalWorkHours = 0;
