@@ -231,7 +231,7 @@ export function StaffAttendanceHistory({
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className="w-full grid grid-cols-6 h-auto p-1">
+          <TabsList className="w-full grid grid-cols-7 h-auto p-1">
             {tabs.map((tab) => (
               <TabsTrigger
                 key={tab.id}
