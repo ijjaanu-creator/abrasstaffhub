@@ -30,6 +30,7 @@ import {
   Trash2,
   FolderOpen,
   AlertTriangle,
+  CalendarDays,
 } from 'lucide-react';
 
 function DepartmentManager() {
