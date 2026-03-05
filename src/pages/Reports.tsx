@@ -40,7 +40,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { StaffAttendanceHistory } from '@/components/reports/StaffAttendanceHistory';
 
-const COLORS = ['hsl(142, 76%, 36%)', 'hsl(0, 84%, 60%)', 'hsl(38, 92%, 50%)', 'hsl(217, 91%, 60%)'];
+const COLORS = ['hsl(142, 76%, 36%)', 'hsl(0, 84%, 60%)', 'hsl(38, 92%, 50%)', 'hsl(217, 91%, 60%)', 'hsl(262, 83%, 58%)'];
 
 type CategoryType = 'present' | 'absent' | 'late' | 'overtime' | 'lossTime' | null;
 
@@ -334,6 +334,7 @@ export default function Reports() {
     present: attendanceData.filter((a: any) => a.status === 'present').length,
     absent: attendanceData.filter((a: any) => a.status === 'absent').length,
     late: attendanceData.filter((a: any) => a.status === 'late').length,
+    holiday: attendanceData.filter((a: any) => a.status === 'holiday').length,
     totalHours: attendanceData.reduce((sum: number, a: any) => sum + Number(a.work_hours || 0), 0),
     totalOvertime: attendanceData.reduce((sum: number, a: any) => sum + Number(a.overtime || 0), 0),
   };
@@ -355,6 +356,7 @@ export default function Reports() {
     { name: 'Present', value: attendanceStats.present },
     { name: 'Absent', value: attendanceStats.absent },
     { name: 'Late', value: attendanceStats.late },
+    { name: 'Holiday', value: attendanceStats.holiday },
   ].filter(item => item.value > 0);
 
   // Payroll pie chart data

@@ -9,6 +9,7 @@ const statusConfig = {
   late: { icon: AlertCircle, label: 'Late', className: 'text-warning bg-warning/10' },
   early_leave: { icon: Clock, label: 'Early Leave', className: 'text-info bg-info/10' },
   half_day: { icon: Clock, label: 'Half Day', className: 'text-muted-foreground bg-muted' },
+  holiday: { icon: CheckCircle2, label: 'Holiday', className: 'text-primary bg-primary/10' },
 };
 
 export function AttendanceOverview() {

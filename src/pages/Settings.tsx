@@ -30,6 +30,7 @@ import {
   Trash2,
   FolderOpen,
   AlertTriangle,
+  CalendarDays,
 } from 'lucide-react';
 
 function DepartmentManager() {
@@ -130,6 +131,131 @@ function DepartmentManager() {
                 className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                 onClick={() => deleteDepartmentMutation.mutate(dept.id)}
                 disabled={deleteDepartmentMutation.isPending}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HolidayManager() {
+  const [newHolidayName, setNewHolidayName] = useState('');
+  const [newHolidayDate, setNewHolidayDate] = useState('');
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: holidays = [], isLoading } = useQuery({
+    queryKey: ['holidays'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('holidays')
+        .select('*')
+        .order('date', { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const addHolidayMutation = useMutation({
+    mutationFn: async ({ name, date }: { name: string; date: string }) => {
+      const { error } = await (supabase as any).from('holidays').insert({ name, date });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['holidays'] });
+      toast({ title: 'Holiday added successfully' });
+      setNewHolidayName('');
+      setNewHolidayDate('');
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error adding holiday', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const deleteHolidayMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).from('holidays').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['holidays'] });
+      toast({ title: 'Holiday deleted' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error deleting holiday', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const handleAddHoliday = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newHolidayName.trim() && newHolidayDate) {
+      addHolidayMutation.mutate({ name: newHolidayName.trim(), date: newHolidayDate });
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-6 shadow-elegant animate-fade-in delay-150">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+          <CalendarDays className="h-5 w-5 text-primary" />
+        </div>
+        <div>
+          <h3 className="font-display text-lg font-semibold text-foreground">Holidays</h3>
+          <p className="text-xs text-muted-foreground">Sundays are automatically treated as holidays</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleAddHoliday} className="flex gap-2 mb-4">
+        <Input
+          placeholder="Holiday name (e.g. Eid)"
+          value={newHolidayName}
+          onChange={(e) => setNewHolidayName(e.target.value)}
+          className="flex-1"
+        />
+        <Input
+          type="date"
+          value={newHolidayDate}
+          onChange={(e) => setNewHolidayDate(e.target.value)}
+          className="w-40"
+        />
+        <Button type="submit" size="icon" disabled={addHolidayMutation.isPending || !newHolidayName.trim() || !newHolidayDate}>
+          {addHolidayMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="h-4 w-4" />
+          )}
+        </Button>
+      </form>
+
+      <div className="space-y-2 max-h-48 overflow-y-auto">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : holidays.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">No holidays added yet</p>
+        ) : (
+          holidays.map((holiday: any) => (
+            <div
+              key={holiday.id}
+              className="flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+            >
+              <div>
+                <span className="text-sm font-medium">{holiday.name}</span>
+                <span className="text-xs text-muted-foreground ml-2">
+                  {new Date(holiday.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => deleteHolidayMutation.mutate(holiday.id)}
+                disabled={deleteHolidayMutation.isPending}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -384,6 +510,9 @@ export default function Settings() {
 
         {/* Department Management */}
         <DepartmentManager />
+
+        {/* Holiday Management */}
+        <HolidayManager />
 
         {/* Work Hours Settings */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-elegant animate-fade-in delay-200">

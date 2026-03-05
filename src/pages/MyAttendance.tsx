@@ -49,6 +49,7 @@ export default function MyAttendance() {
       case 'present': return 'bg-success/10 text-success';
       case 'late': return 'bg-warning/10 text-warning';
       case 'absent': return 'bg-destructive/10 text-destructive';
+      case 'holiday': return 'bg-primary/10 text-primary';
       default: return 'bg-muted text-muted-foreground';
     }
   };
@@ -72,6 +73,7 @@ export default function MyAttendance() {
   const presentDays = attendanceRecords.filter(r => r.status === 'present').length;
   const lateDays = attendanceRecords.filter(r => r.status === 'late').length;
   const absentDays = attendanceRecords.filter(r => r.status === 'absent').length;
+  const holidayDays = attendanceRecords.filter(r => r.status === 'holiday').length;
 
   return (
     <div className="space-y-6">
@@ -94,7 +96,7 @@ export default function MyAttendance() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div className="rounded-xl border bg-card p-4 text-center">
           <p className="text-2xl font-bold text-success">{presentDays}</p>
           <p className="text-sm text-muted-foreground">Present</p>
@@ -106,6 +108,10 @@ export default function MyAttendance() {
         <div className="rounded-xl border bg-card p-4 text-center">
           <p className="text-2xl font-bold text-destructive">{absentDays}</p>
           <p className="text-sm text-muted-foreground">Absent</p>
+        </div>
+        <div className="rounded-xl border bg-card p-4 text-center">
+          <p className="text-2xl font-bold text-primary">{holidayDays}</p>
+          <p className="text-sm text-muted-foreground">Holiday</p>
         </div>
       </div>
 

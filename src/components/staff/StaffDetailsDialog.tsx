@@ -53,6 +53,7 @@ const statusConfig = {
   present: { icon: CheckCircle, label: 'Present', className: 'bg-success/10 text-success' },
   absent: { icon: XCircle, label: 'Absent', className: 'bg-destructive/10 text-destructive' },
   late: { icon: AlertCircle, label: 'Late', className: 'bg-warning/10 text-warning' },
+  holiday: { icon: CalendarDays, label: 'Holiday', className: 'bg-primary/10 text-primary' },
 };
 
 export function StaffDetailsDialog({ open, onOpenChange, staff }: StaffDetailsDialogProps) {
@@ -130,6 +131,7 @@ export function StaffDetailsDialog({ open, onOpenChange, staff }: StaffDetailsDi
   const presentDays = attendanceRecords.filter(r => r.status === 'present').length;
   const absentDays = attendanceRecords.filter(r => r.status === 'absent').length;
   const lateDays = attendanceRecords.filter(r => r.status === 'late').length;
+  const holidayDays = attendanceRecords.filter(r => r.status === 'holiday').length;
 
   // Calculate total work hours and overtime
   let totalWorkHours = 0;
@@ -152,8 +154,13 @@ export function StaffDetailsDialog({ open, onOpenChange, staff }: StaffDetailsDi
     }
   });
 
-  // Calculate payment
-  const workingDaysInMonth = 26; // Assuming 26 working days
+  // Calculate payment - dynamic working days (total days minus Sundays)
+  const daysInMonth = endOfMonth(monthStart).getDate();
+  let sundaysInMonth = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    if (new Date(selectedYear, selectedMonth, d).getDay() === 0) sundaysInMonth++;
+  }
+  const workingDaysInMonth = daysInMonth - sundaysInMonth;
   const dailyRate = staff.salary / workingDaysInMonth;
   const hourlyRate = dailyRate / expectedHoursPerDay;
 
@@ -244,7 +251,7 @@ export function StaffDetailsDialog({ open, onOpenChange, staff }: StaffDetailsDi
             ) : (
               <div className="space-y-4">
                 {/* Stats Summary */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   <div className="rounded-lg border p-3 text-center">
                     <div className="text-2xl font-bold text-success">{presentDays}</div>
                     <div className="text-xs text-muted-foreground">Present</div>
@@ -256,6 +263,10 @@ export function StaffDetailsDialog({ open, onOpenChange, staff }: StaffDetailsDi
                   <div className="rounded-lg border p-3 text-center">
                     <div className="text-2xl font-bold text-warning">{lateDays}</div>
                     <div className="text-xs text-muted-foreground">Late</div>
+                  </div>
+                  <div className="rounded-lg border p-3 text-center">
+                    <div className="text-2xl font-bold text-primary">{holidayDays}</div>
+                    <div className="text-xs text-muted-foreground">Holiday</div>
                   </div>
                   <div className="rounded-lg border p-3 text-center">
                     <div className="text-2xl font-bold text-primary">{totalOvertimeHours.toFixed(1)}h</div>
@@ -361,7 +372,7 @@ export function StaffDetailsDialog({ open, onOpenChange, staff }: StaffDetailsDi
                       <span>₹{staff.salary.toLocaleString()}</span>
                     </div>
                     <div className="p-3 flex justify-between">
-                      <span className="text-muted-foreground">Daily Rate (26 days)</span>
+                      <span className="text-muted-foreground">Daily Rate ({workingDaysInMonth} days)</span>
                       <span>₹{dailyRate.toFixed(0)}</span>
                     </div>
                     <div className="p-3 flex justify-between">

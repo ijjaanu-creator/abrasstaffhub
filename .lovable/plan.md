@@ -1,79 +1,105 @@
 
 
-## Holiday & Weekend Handling
+# Push Notification Reminders for Staff (Every 30 Minutes)
 
-### What You Want
-- **Sunday** = weekend (holiday)
-- **Festival days** (Eid, Onam, etc.) = holidays — admin can manage these
-- If staff **comes** on a holiday → mark as **present** (no extra bonus)
-- If staff **doesn't come** on a holiday → mark as **holiday** (no salary deduction)
+## What This Does
 
-### Changes Required
+Staff members who have location tracking enabled will receive a push notification every 30 minutes reminding them to open the app. This helps keep their live location updated even when they close or background the app.
 
-#### 1. New `holidays` Database Table
-Create a table for admin-managed holidays (festivals, special days):
-- `id`, `date`, `name`, `created_at`
-- RLS: admins can manage, all authenticated users can view
+The notification will look like a friendly reminder: *"Open Abras Staff Hub to keep your location updated"* -- and tapping it will open the app directly.
 
-#### 2. Update `mark_absent_for_date` Function
-Modify the nightly cron function so that:
-- If the date is a **Sunday** or exists in the `holidays` table → insert status `'holiday'` instead of `'absent'`
-- If the date is a regular working day → keep inserting `'absent'` as before
+## How It Works
 
-#### 3. Backfill Historical Data
-Run a one-time update to change existing `absent` records on Sundays and holiday dates to `holiday`.
+1. When a staff member checks in, the app asks for **notification permission** on their phone
+2. Their notification subscription is saved to the database
+3. A scheduled backend job runs every 30 minutes and sends push notifications to all checked-in staff who have location tracking enabled
+4. Tapping the notification opens the app, which automatically resumes location tracking
 
-#### 4. Holiday Management UI in Settings
-Add a section in the Settings page for admins to:
-- Add a holiday (date + name, e.g. "Eid al-Fitr", "Onam")
-- View and delete existing holidays
+## Implementation Steps
 
-#### 5. Update Salary Calculations
-In `StaffDetailsDialog.tsx` (payment tab), the current logic deducts salary for absent days. Changes:
-- **Holiday days** should NOT count as absent — no salary deduction
-- **Present on holidays** should count as normal present — no extra bonus
-- Update `absentDays` filter to exclude `'holiday'` status
-- Currently uses hardcoded `workingDaysInMonth = 26` — update to dynamically calculate: total days in month minus Sundays minus holidays
+### Step 1: Generate VAPID Keys (Required for Push Notifications)
 
-#### 6. Update Status Config Across UI
-Add `'holiday'` status to the status config objects in:
-- `Attendance.tsx` — icon, label, styling
-- `AttendanceOverview.tsx` — icon, label, styling
-- `Reports.tsx` — include in analytics
-- `MyAttendance.tsx` — display styling
-- `StaffAttendanceHistory.tsx` — new tab/category
+Push notifications require special security keys called VAPID keys. A backend function will be created to generate these, and the public key will need to be stored as a secret.
 
-#### 7. MarkAttendance Page
-No changes needed — staff can still check in on Sundays/holidays and get marked as `present`. The holiday logic only applies to the auto-absent system.
+- Create a VAPID key pair (a one-time setup)
+- Store the **private key** and **email** as backend secrets
+- The **public key** will be used in the app code
 
-### Technical Details
+### Step 2: Database Changes
 
-**New table schema:**
-```sql
-CREATE TABLE public.holidays (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  date date NOT NULL UNIQUE,
-  name text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-```
+Create a new table `push_subscriptions` to store each staff member's notification subscription:
 
-**Updated cron function logic (pseudocode):**
-```sql
--- Check if _date is Sunday or in holidays table
-IF (EXTRACT(DOW FROM _date) = 0) OR EXISTS (SELECT 1 FROM holidays WHERE date = _date) THEN
-  INSERT ... status = 'holiday'
-ELSE
-  INSERT ... status = 'absent'
-END IF;
-```
+- `id` (primary key)
+- `staff_id` (links to staff member)
+- `user_id` (links to user account)
+- `endpoint` (the push service URL)
+- `p256dh` (encryption key)
+- `auth` (authentication secret)
+- `created_at` (timestamp)
 
-**Salary calculation fix:**
-```typescript
-const holidayDays = attendanceRecords.filter(r => r.status === 'holiday').length;
-const absentDays = attendanceRecords.filter(r => r.status === 'absent').length;
-// Holidays don't get deducted; only true absences do
-const absentDeduction = absentDays * dailyRate;
-// Working days = total days - sundays - holidays (dynamic)
-```
+Add proper security policies so staff can only manage their own subscriptions.
+
+### Step 3: Custom Service Worker
+
+Create a custom service worker file that:
+
+- Listens for incoming push notifications
+- Shows the notification with the reminder message and the app icon
+- Opens the app when the notification is tapped
+
+### Step 4: Notification Permission & Subscription (Frontend)
+
+Create a new hook (`use-push-notifications.ts`) that:
+
+- Requests notification permission from the staff's browser/phone
+- Subscribes to push notifications using the VAPID public key
+- Saves the subscription to the database
+- This is triggered automatically when a staff member checks in
+
+Update the Mark Attendance page to:
+
+- Request notification permission after a successful check-in
+- Show a small prompt if permission hasn't been granted yet
+
+### Step 5: Backend Function to Send Notifications
+
+Create a new backend function (`send-tracking-reminder`) that:
+
+- Queries for all staff who are currently checked in (have check-in but no check-out today) AND have location tracking enabled
+- Fetches their push subscriptions from the database
+- Sends a push notification to each one with the reminder message
+- Cleans up any expired/invalid subscriptions
+
+### Step 6: Scheduled Job (Every 30 Minutes)
+
+Set up a database cron job that calls the `send-tracking-reminder` function every 30 minutes automatically. This runs in the background without any manual intervention.
+
+---
+
+## Technical Details
+
+### New Files
+- `public/custom-sw.js` -- Service worker that handles push notification display and click
+- `src/hooks/use-push-notifications.ts` -- Hook to manage push subscription lifecycle
+- `supabase/functions/send-tracking-reminder/index.ts` -- Backend function to send push notifications
+
+### Modified Files
+- `vite.config.ts` -- Configure PWA plugin to inject the custom service worker
+- `src/pages/MarkAttendance.tsx` -- Trigger notification permission request on check-in
+- `supabase/config.toml` -- Register the new backend function (no JWT verification since it's called by cron)
+
+### Database Changes
+- New `push_subscriptions` table with RLS policies
+- New cron job: runs every 30 minutes calling the send-tracking-reminder function
+
+### Secrets Required
+- `VAPID_PUBLIC_KEY` -- Public key for push subscription (also embedded in frontend)
+- `VAPID_PRIVATE_KEY` -- Private key for signing push messages
+- `VAPID_SUBJECT` -- Contact email for VAPID (e.g., mailto:admin@abras.com)
+
+### Important Notes
+- Push notifications work on Android and most desktop browsers immediately
+- On iPhone (iOS), push notifications work only if the app is installed to the home screen (which your /get-abras page already guides staff to do)
+- Staff will see a one-time browser prompt asking to allow notifications when they first check in
+- If a staff member denies notification permission, everything else still works normally -- they just won't get the reminders
 

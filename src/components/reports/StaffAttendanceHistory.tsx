@@ -80,6 +80,7 @@ export function StaffAttendanceHistory({
   const presentDays = processedRecords.filter(r => r.status === 'present');
   const absentDays = processedRecords.filter(r => r.status === 'absent');
   const lateDays = processedRecords.filter(r => r.status === 'late');
+  const holidayDays = processedRecords.filter(r => r.status === 'holiday');
   const overtimeDays = processedRecords.filter(r => r.overtime > 0);
   const lossTimeDays = processedRecords.filter(r => r.lossTime > 0);
 
@@ -102,6 +103,8 @@ export function StaffAttendanceHistory({
         return <Badge className="bg-destructive/10 text-destructive border-destructive/20">Absent</Badge>;
       case 'late':
         return <Badge className="bg-warning/10 text-warning border-warning/20">Late</Badge>;
+      case 'holiday':
+        return <Badge className="bg-primary/10 text-primary border-primary/20">Holiday</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -168,6 +171,7 @@ export function StaffAttendanceHistory({
     { id: 'present', label: 'Present', icon: CheckCircle2, count: stats.presentCount, color: 'text-success' },
     { id: 'absent', label: 'Absent', icon: XCircle, count: stats.absentCount, color: 'text-destructive' },
     { id: 'late', label: 'Late', icon: AlertCircle, count: stats.lateCount, color: 'text-warning' },
+    { id: 'holiday', label: 'Holiday', icon: Calendar, count: holidayDays.length, color: 'text-primary' },
     { id: 'overtime', label: 'Overtime', icon: TrendingUp, count: overtimeDays.length, color: 'text-success' },
     { id: 'losstime', label: 'Loss Time', icon: Clock, count: lossTimeDays.length, color: 'text-destructive' },
   ];
@@ -227,7 +231,7 @@ export function StaffAttendanceHistory({
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className="w-full grid grid-cols-6 h-auto p-1">
+          <TabsList className="w-full grid grid-cols-7 h-auto p-1">
             {tabs.map((tab) => (
               <TabsTrigger
                 key={tab.id}
@@ -253,6 +257,9 @@ export function StaffAttendanceHistory({
             </TabsContent>
             <TabsContent value="late" className="mt-0">
               {renderDaysList(lateDays)}
+            </TabsContent>
+            <TabsContent value="holiday" className="mt-0">
+              {renderDaysList(holidayDays)}
             </TabsContent>
             <TabsContent value="overtime" className="mt-0">
               {renderDaysList(overtimeDays, true, false)}
