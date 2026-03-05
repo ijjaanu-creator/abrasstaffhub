@@ -171,6 +171,7 @@ export function StaffAttendanceHistory({
     { id: 'present', label: 'Present', icon: CheckCircle2, count: stats.presentCount, color: 'text-success' },
     { id: 'absent', label: 'Absent', icon: XCircle, count: stats.absentCount, color: 'text-destructive' },
     { id: 'late', label: 'Late', icon: AlertCircle, count: stats.lateCount, color: 'text-warning' },
+    { id: 'holiday', label: 'Holiday', icon: Calendar, count: holidayDays.length, color: 'text-primary' },
     { id: 'overtime', label: 'Overtime', icon: TrendingUp, count: overtimeDays.length, color: 'text-success' },
     { id: 'losstime', label: 'Loss Time', icon: Clock, count: lossTimeDays.length, color: 'text-destructive' },
   ];
