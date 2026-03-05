@@ -511,6 +511,9 @@ export default function Settings() {
         {/* Department Management */}
         <DepartmentManager />
 
+        {/* Holiday Management */}
+        <HolidayManager />
+
         {/* Work Hours Settings */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-elegant animate-fade-in delay-200">
           <div className="flex items-center gap-3 mb-6">
