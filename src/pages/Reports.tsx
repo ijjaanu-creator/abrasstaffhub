@@ -40,7 +40,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { StaffAttendanceHistory } from '@/components/reports/StaffAttendanceHistory';
 
-const COLORS = ['hsl(142, 76%, 36%)', 'hsl(0, 84%, 60%)', 'hsl(38, 92%, 50%)', 'hsl(217, 91%, 60%)'];
+const COLORS = ['hsl(142, 76%, 36%)', 'hsl(0, 84%, 60%)', 'hsl(38, 92%, 50%)', 'hsl(217, 91%, 60%)', 'hsl(262, 83%, 58%)'];
 
 type CategoryType = 'present' | 'absent' | 'late' | 'overtime' | 'lossTime' | null;
 
