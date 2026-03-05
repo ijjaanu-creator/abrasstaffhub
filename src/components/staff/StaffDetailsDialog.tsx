@@ -251,7 +251,7 @@ export function StaffDetailsDialog({ open, onOpenChange, staff }: StaffDetailsDi
             ) : (
               <div className="space-y-4">
                 {/* Stats Summary */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   <div className="rounded-lg border p-3 text-center">
                     <div className="text-2xl font-bold text-success">{presentDays}</div>
                     <div className="text-xs text-muted-foreground">Present</div>
@@ -263,6 +263,10 @@ export function StaffDetailsDialog({ open, onOpenChange, staff }: StaffDetailsDi
                   <div className="rounded-lg border p-3 text-center">
                     <div className="text-2xl font-bold text-warning">{lateDays}</div>
                     <div className="text-xs text-muted-foreground">Late</div>
+                  </div>
+                  <div className="rounded-lg border p-3 text-center">
+                    <div className="text-2xl font-bold text-primary">{holidayDays}</div>
+                    <div className="text-xs text-muted-foreground">Holiday</div>
                   </div>
                   <div className="rounded-lg border p-3 text-center">
                     <div className="text-2xl font-bold text-primary">{totalOvertimeHours.toFixed(1)}h</div>
