@@ -103,6 +103,8 @@ export function StaffAttendanceHistory({
         return <Badge className="bg-destructive/10 text-destructive border-destructive/20">Absent</Badge>;
       case 'late':
         return <Badge className="bg-warning/10 text-warning border-warning/20">Late</Badge>;
+      case 'holiday':
+        return <Badge className="bg-primary/10 text-primary border-primary/20">Holiday</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
