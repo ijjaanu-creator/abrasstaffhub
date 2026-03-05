@@ -49,6 +49,7 @@ export default function MyAttendance() {
       case 'present': return 'bg-success/10 text-success';
       case 'late': return 'bg-warning/10 text-warning';
       case 'absent': return 'bg-destructive/10 text-destructive';
+      case 'holiday': return 'bg-primary/10 text-primary';
       default: return 'bg-muted text-muted-foreground';
     }
   };
