@@ -334,6 +334,7 @@ export default function Reports() {
     present: attendanceData.filter((a: any) => a.status === 'present').length,
     absent: attendanceData.filter((a: any) => a.status === 'absent').length,
     late: attendanceData.filter((a: any) => a.status === 'late').length,
+    holiday: attendanceData.filter((a: any) => a.status === 'holiday').length,
     totalHours: attendanceData.reduce((sum: number, a: any) => sum + Number(a.work_hours || 0), 0),
     totalOvertime: attendanceData.reduce((sum: number, a: any) => sum + Number(a.overtime || 0), 0),
   };
