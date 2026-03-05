@@ -178,7 +178,7 @@ function HolidayManager() {
 
   const deleteHolidayMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('holidays').delete().eq('id', id);
+      const { error } = await (supabase as any).from('holidays').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
