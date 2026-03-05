@@ -368,7 +368,7 @@ export function StaffDetailsDialog({ open, onOpenChange, staff }: StaffDetailsDi
                       <span>₹{staff.salary.toLocaleString()}</span>
                     </div>
                     <div className="p-3 flex justify-between">
-                      <span className="text-muted-foreground">Daily Rate (26 days)</span>
+                      <span className="text-muted-foreground">Daily Rate ({workingDaysInMonth} days)</span>
                       <span>₹{dailyRate.toFixed(0)}</span>
                     </div>
                     <div className="p-3 flex justify-between">
