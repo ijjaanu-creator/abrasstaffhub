@@ -53,6 +53,7 @@ const statusConfig = {
   present: { icon: CheckCircle, label: 'Present', className: 'bg-success/10 text-success' },
   absent: { icon: XCircle, label: 'Absent', className: 'bg-destructive/10 text-destructive' },
   late: { icon: AlertCircle, label: 'Late', className: 'bg-warning/10 text-warning' },
+  holiday: { icon: CalendarDays, label: 'Holiday', className: 'bg-primary/10 text-primary' },
 };
 
 export function StaffDetailsDialog({ open, onOpenChange, staff }: StaffDetailsDialogProps) {
