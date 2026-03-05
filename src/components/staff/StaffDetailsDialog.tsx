@@ -154,20 +154,14 @@ export function StaffDetailsDialog({ open, onOpenChange, staff }: StaffDetailsDi
     }
   });
 
-  // Calculate payment - dynamic working days (total days minus Sundays minus holidays)
+  // Calculate payment - dynamic working days (total days minus Sundays)
   const daysInMonth = endOfMonth(monthStart).getDate();
   let sundaysInMonth = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     if (new Date(selectedYear, selectedMonth, d).getDay() === 0) sundaysInMonth++;
   }
-  const workingDaysInMonth = daysInMonth - sundaysInMonth - holidayDays + 
-    // holidayDays from attendance already includes sundays marked as holiday, avoid double-counting
-    // Actually holidayDays is from attendance records which may include sundays already
-    // Let's simplify: working days = days in month - sundays count - non-sunday holidays
-    0; // correction below
-  // Recalculate properly
-  const actualWorkingDaysInMonth = daysInMonth - sundaysInMonth;
-  const dailyRate = staff.salary / actualWorkingDaysInMonth;
+  const workingDaysInMonth = daysInMonth - sundaysInMonth;
+  const dailyRate = staff.salary / workingDaysInMonth;
   const hourlyRate = dailyRate / expectedHoursPerDay;
 
   const enableOvertime = appSettingsData?.enable_overtime ?? true;
