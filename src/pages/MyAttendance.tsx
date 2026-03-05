@@ -96,7 +96,7 @@ export default function MyAttendance() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div className="rounded-xl border bg-card p-4 text-center">
           <p className="text-2xl font-bold text-success">{presentDays}</p>
           <p className="text-sm text-muted-foreground">Present</p>
@@ -108,6 +108,10 @@ export default function MyAttendance() {
         <div className="rounded-xl border bg-card p-4 text-center">
           <p className="text-2xl font-bold text-destructive">{absentDays}</p>
           <p className="text-sm text-muted-foreground">Absent</p>
+        </div>
+        <div className="rounded-xl border bg-card p-4 text-center">
+          <p className="text-2xl font-bold text-primary">{holidayDays}</p>
+          <p className="text-sm text-muted-foreground">Holiday</p>
         </div>
       </div>
 

@@ -258,6 +258,9 @@ export function StaffAttendanceHistory({
             <TabsContent value="late" className="mt-0">
               {renderDaysList(lateDays)}
             </TabsContent>
+            <TabsContent value="holiday" className="mt-0">
+              {renderDaysList(holidayDays)}
+            </TabsContent>
             <TabsContent value="overtime" className="mt-0">
               {renderDaysList(overtimeDays, true, false)}
             </TabsContent>
