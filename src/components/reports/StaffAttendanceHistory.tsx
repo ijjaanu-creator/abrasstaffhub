@@ -80,6 +80,7 @@ export function StaffAttendanceHistory({
   const presentDays = processedRecords.filter(r => r.status === 'present');
   const absentDays = processedRecords.filter(r => r.status === 'absent');
   const lateDays = processedRecords.filter(r => r.status === 'late');
+  const holidayDays = processedRecords.filter(r => r.status === 'holiday');
   const overtimeDays = processedRecords.filter(r => r.overtime > 0);
   const lossTimeDays = processedRecords.filter(r => r.lossTime > 0);
 
