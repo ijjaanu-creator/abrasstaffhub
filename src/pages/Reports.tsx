@@ -356,6 +356,7 @@ export default function Reports() {
     { name: 'Present', value: attendanceStats.present },
     { name: 'Absent', value: attendanceStats.absent },
     { name: 'Late', value: attendanceStats.late },
+    { name: 'Holiday', value: attendanceStats.holiday },
   ].filter(item => item.value > 0);
 
   // Payroll pie chart data
