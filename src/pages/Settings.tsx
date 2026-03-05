@@ -151,7 +151,7 @@ function HolidayManager() {
   const { data: holidays = [], isLoading } = useQuery({
     queryKey: ['holidays'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('holidays')
         .select('*')
         .order('date', { ascending: true });
