@@ -577,6 +577,7 @@ export type Database = {
         Args: { _email: string; _staff_id: string; _user_id: string }
         Returns: boolean
       }
+      mark_absent_for_date: { Args: { _date: string }; Returns: undefined }
       validate_staff_signup: {
         Args: { _phone: string }
         Returns: {
