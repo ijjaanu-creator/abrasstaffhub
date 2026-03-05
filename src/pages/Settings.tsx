@@ -162,7 +162,7 @@ function HolidayManager() {
 
   const addHolidayMutation = useMutation({
     mutationFn: async ({ name, date }: { name: string; date: string }) => {
-      const { error } = await supabase.from('holidays').insert({ name, date });
+      const { error } = await (supabase as any).from('holidays').insert({ name, date });
       if (error) throw error;
     },
     onSuccess: () => {
