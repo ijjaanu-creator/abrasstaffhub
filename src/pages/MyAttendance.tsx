@@ -73,6 +73,7 @@ export default function MyAttendance() {
   const presentDays = attendanceRecords.filter(r => r.status === 'present').length;
   const lateDays = attendanceRecords.filter(r => r.status === 'late').length;
   const absentDays = attendanceRecords.filter(r => r.status === 'absent').length;
+  const holidayDays = attendanceRecords.filter(r => r.status === 'holiday').length;
 
   return (
     <div className="space-y-6">
