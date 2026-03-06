@@ -9,6 +9,8 @@ import {
   Calendar,
   CheckCircle2,
   TrendingUp,
+  CalendarDays,
+  PartyPopper,
 } from 'lucide-react';
 
 export default function StaffDashboard() {
@@ -86,6 +88,22 @@ export default function StaffDashboard() {
       return data;
     },
     enabled: !!staffMember?.id,
+  });
+
+  // Fetch upcoming holidays
+  const { data: upcomingHolidays = [] } = useQuery({
+    queryKey: ['upcoming-holidays'],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await (supabase as any)
+        .from('holidays')
+        .select('*')
+        .gte('date', today)
+        .order('date', { ascending: true })
+        .limit(10);
+      if (error) throw error;
+      return data || [];
+    },
   });
 
   const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -278,6 +296,8 @@ export default function StaffDashboard() {
                               ? 'bg-warning/10 text-warning'
                               : record.status === 'absent'
                               ? 'bg-destructive/10 text-destructive'
+                              : record.status === 'holiday'
+                              ? 'bg-primary/10 text-primary'
                               : 'bg-muted text-muted-foreground'
                           )}
                         >
@@ -290,6 +310,52 @@ export default function StaffDashboard() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Upcoming Holidays */}
+        <div className="rounded-xl border border-border bg-card p-6 shadow-elegant animate-fade-in delay-400 lg:col-span-2">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+              <CalendarDays className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-display text-lg font-semibold text-foreground">
+                Upcoming Holidays
+              </h3>
+              <p className="text-sm text-muted-foreground">Sundays + scheduled holidays (no salary deduction)</p>
+            </div>
+          </div>
+
+          {upcomingHolidays.length === 0 ? (
+            <p className="text-center text-muted-foreground py-6">No upcoming holidays scheduled</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {upcomingHolidays.map((holiday: any) => {
+                const holidayDate = new Date(holiday.date + 'T00:00:00');
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const diffDays = Math.ceil((holidayDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                
+                return (
+                  <div
+                    key={holiday.id}
+                    className="flex items-center gap-3 rounded-lg border border-border p-3 bg-muted/30"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                      <PartyPopper className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{holiday.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {holidayDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        {diffDays === 0 ? ' • Today' : diffDays === 1 ? ' • Tomorrow' : ` • in ${diffDays} days`}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
