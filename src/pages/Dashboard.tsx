@@ -4,7 +4,7 @@ import StaffDashboard from './StaffDashboard';
 import { Loader2 } from 'lucide-react';
 
 export default function Dashboard() {
-  const { isAdmin, isLoading, userRole, isRoleLoading } = useAuth();
+  const { isAdmin, isLoading, userRole, isRoleLoading, isAccountant, adminViewMode } = useAuth();
 
   // Wait for auth + role lookup to finish before rendering
   if (isLoading || isRoleLoading) {
@@ -15,5 +15,5 @@ export default function Dashboard() {
     );
   }
 
-  return isAdmin ? <AdminDashboard /> : <StaffDashboard />;
+  return (isAdmin || (isAccountant && adminViewMode)) ? <AdminDashboard /> : <StaffDashboard />;
 }

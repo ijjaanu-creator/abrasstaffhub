@@ -11,6 +11,8 @@ import {
   LogOut,
   Fingerprint,
   User,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BrandLogo } from '@/components/BrandLogo';
@@ -32,15 +34,28 @@ const staffNavItems = [
   { icon: User, label: 'Profile', path: '/profile' },
 ];
 
+// Accountant in admin view sees admin pages except Settings
+const accountantViewNavItems = [
+  { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+  { icon: Users, label: 'Staff', path: '/staff' },
+  { icon: Clock, label: 'Attendance', path: '/attendance' },
+  { icon: Wallet, label: 'Payroll', path: '/payroll' },
+  { icon: FileText, label: 'Reports', path: '/reports' },
+];
+
 interface SidebarProps {
   onNavigate?: () => void;
 }
 
 export function Sidebar({ onNavigate }: SidebarProps) {
   const location = useLocation();
-  const { user, logout, isAdmin, userRole } = useAuth();
+  const { user, logout, isAdmin, userRole, isAccountant, adminViewMode, setAdminViewMode } = useAuth();
 
-  const navItems = isAdmin ? adminNavItems : staffNavItems;
+  const navItems = isAdmin 
+    ? adminNavItems 
+    : (isAccountant && adminViewMode) 
+      ? accountantViewNavItems 
+      : staffNavItems;
   const displayName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
 
   const handleNavClick = () => {
@@ -64,6 +79,20 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           <p className="text-xs text-muted-foreground">Natural Spices</p>
         </div>
       </div>
+
+      {/* Accountant Admin View Toggle */}
+      {isAccountant && !isAdmin && (
+        <div className="px-3 pt-3">
+          <Button
+            variant={adminViewMode ? 'default' : 'outline'}
+            className="w-full justify-start gap-3 text-sm"
+            onClick={() => setAdminViewMode(!adminViewMode)}
+          >
+            {adminViewMode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {adminViewMode ? 'Exit Admin View' : 'Admin View'}
+          </Button>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-4">
