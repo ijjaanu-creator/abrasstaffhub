@@ -235,9 +235,19 @@ export default function Payroll() {
                   <p className="font-medium">₹{record.base_salary?.toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">Net Salary</p>
-                  <p className="font-medium text-primary">₹{record.net_salary?.toLocaleString()}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {record.payment_mode === 'advance' ? 'Advance Paid' : 'Net Salary'}
+                  </p>
+                  <p className="font-medium text-primary">
+                    ₹{(record.payment_mode === 'advance' ? record.advance_amount : record.net_salary)?.toLocaleString()}
+                  </p>
                 </div>
+                {record.payment_mode === 'advance' && record.remaining_amount > 0 && (
+                  <div className="col-span-2">
+                    <p className="text-muted-foreground text-xs">Remaining Balance</p>
+                    <p className="font-medium text-warning">₹{record.remaining_amount?.toLocaleString()}</p>
+                  </div>
+                )}
               </div>
 
               {record.status === 'pending' && (
