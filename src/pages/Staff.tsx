@@ -658,43 +658,45 @@ export default function Staff() {
             </div>
 
             {/* Actions */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-10 top-2 lg:right-12 lg:top-3 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(staff); }}>
-                  Edit Details
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={(e) => { e.stopPropagation(); toggleStatusMutation.mutate({ id: staff.id, status: staff.status }); }}
-                  className={staff.status === 'active' ? 'text-destructive' : 'text-success'}
-                >
-                  {staff.status === 'active' ? 'Deactivate' : 'Activate'}
-                </DropdownMenuItem>
-                {staff.status === 'inactive' && (
-                  <DropdownMenuItem 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(`Are you sure you want to permanently remove ${staff.name}? This action cannot be undone.`)) {
-                        deleteStaffMutation.mutate(staff.id);
-                      }
-                    }}
-                    className="text-destructive"
+            {!isReadOnly && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-10 top-2 lg:right-12 lg:top-3 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Remove Permanently
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(staff); }}>
+                    Edit Details
                   </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuItem 
+                    onClick={(e) => { e.stopPropagation(); toggleStatusMutation.mutate({ id: staff.id, status: staff.status }); }}
+                    className={staff.status === 'active' ? 'text-destructive' : 'text-success'}
+                  >
+                    {staff.status === 'active' ? 'Deactivate' : 'Activate'}
+                  </DropdownMenuItem>
+                  {staff.status === 'inactive' && (
+                    <DropdownMenuItem 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Are you sure you want to permanently remove ${staff.name}? This action cannot be undone.`)) {
+                          deleteStaffMutation.mutate(staff.id);
+                        }
+                      }}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Remove Permanently
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
             {/* Avatar & Basic Info */}
             <div className="flex items-start gap-3 lg:gap-4 mb-4">

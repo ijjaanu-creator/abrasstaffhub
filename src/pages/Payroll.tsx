@@ -373,7 +373,7 @@ export default function Payroll() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {record.status === 'pending' && (
+                      {!isReadOnly && record.status === 'pending' && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -382,7 +382,7 @@ export default function Payroll() {
                           Process
                         </Button>
                       )}
-                      {record.status === 'processed' && (
+                      {!isReadOnly && record.status === 'processed' && (
                         <Button
                           variant="default"
                           size="sm"
