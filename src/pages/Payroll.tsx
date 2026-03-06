@@ -104,16 +104,18 @@ export default function Payroll() {
           </p>
         </div>
         <div className="flex gap-3">
-          <Button
-            variant="default"
-            size="lg"
-            className="flex-1 sm:flex-none"
-            onClick={() => setShowPayDialog(true)}
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            <span className="hidden sm:inline">Pay Salary</span>
-            <span className="sm:hidden">Pay</span>
-          </Button>
+          {!isReadOnly && (
+            <Button
+              variant="default"
+              size="lg"
+              className="flex-1 sm:flex-none"
+              onClick={() => setShowPayDialog(true)}
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              <span className="hidden sm:inline">Pay Salary</span>
+              <span className="sm:hidden">Pay</span>
+            </Button>
+          )}
           <Button 
             variant="outline" 
             size="lg" 
