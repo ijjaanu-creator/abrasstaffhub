@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -30,6 +31,8 @@ export default function Payroll() {
   const [showPayDialog, setShowPayDialog] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isAdmin, isAccountant, adminViewMode } = useAuth();
+  const isReadOnly = !isAdmin && isAccountant && adminViewMode;
 
   const { data: payrollRecords = [], isLoading } = useQuery({
     queryKey: ['payroll-records'],
@@ -101,16 +104,18 @@ export default function Payroll() {
           </p>
         </div>
         <div className="flex gap-3">
-          <Button
-            variant="default"
-            size="lg"
-            className="flex-1 sm:flex-none"
-            onClick={() => setShowPayDialog(true)}
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            <span className="hidden sm:inline">Pay Salary</span>
-            <span className="sm:hidden">Pay</span>
-          </Button>
+          {!isReadOnly && (
+            <Button
+              variant="default"
+              size="lg"
+              className="flex-1 sm:flex-none"
+              onClick={() => setShowPayDialog(true)}
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              <span className="hidden sm:inline">Pay Salary</span>
+              <span className="sm:hidden">Pay</span>
+            </Button>
+          )}
           <Button 
             variant="outline" 
             size="lg" 
@@ -230,12 +235,22 @@ export default function Payroll() {
                   <p className="font-medium">₹{record.base_salary?.toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">Net Salary</p>
-                  <p className="font-medium text-primary">₹{record.net_salary?.toLocaleString()}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {record.payment_mode === 'advance' ? 'Advance Paid' : 'Net Salary'}
+                  </p>
+                  <p className="font-medium text-primary">
+                    ₹{(record.payment_mode === 'advance' ? record.advance_amount : record.net_salary)?.toLocaleString()}
+                  </p>
                 </div>
+                {record.payment_mode === 'advance' && record.remaining_amount > 0 && (
+                  <div className="col-span-2">
+                    <p className="text-muted-foreground text-xs">Remaining Balance</p>
+                    <p className="font-medium text-warning">₹{record.remaining_amount?.toLocaleString()}</p>
+                  </div>
+                )}
               </div>
 
-              {record.status === 'pending' && (
+              {!isReadOnly && record.status === 'pending' && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -245,7 +260,7 @@ export default function Payroll() {
                   Process
                 </Button>
               )}
-              {record.status === 'processed' && (
+              {!isReadOnly && record.status === 'processed' && (
                 <Button
                   variant="default"
                   size="sm"
@@ -335,7 +350,16 @@ export default function Payroll() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-right font-semibold text-foreground">
-                      ₹{record.net_salary?.toLocaleString()}
+                      {record.payment_mode === 'advance' ? (
+                        <div>
+                          <p>₹{record.advance_amount?.toLocaleString()}</p>
+                          {record.remaining_amount > 0 && (
+                            <p className="text-xs font-normal text-warning">₹{record.remaining_amount?.toLocaleString()} pending</p>
+                          )}
+                        </div>
+                      ) : (
+                        <>₹{record.net_salary?.toLocaleString()}</>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div
@@ -349,7 +373,7 @@ export default function Payroll() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {record.status === 'pending' && (
+                      {!isReadOnly && record.status === 'pending' && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -358,7 +382,7 @@ export default function Payroll() {
                           Process
                         </Button>
                       )}
-                      {record.status === 'processed' && (
+                      {!isReadOnly && record.status === 'processed' && (
                         <Button
                           variant="default"
                           size="sm"

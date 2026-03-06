@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -493,6 +494,9 @@ export default function Staff() {
     );
   }
 
+  const { isAdmin, isAccountant, adminViewMode } = useAuth();
+  const isReadOnly = !isAdmin && isAccountant && adminViewMode;
+
   return (
     <div className="space-y-6 lg:space-y-8">
       {/* Header */}
@@ -500,23 +504,25 @@ export default function Staff() {
         <div>
           <h1 className="font-display text-2xl lg:text-3xl font-bold text-foreground">Staff Directory</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage your team members and their information
+            {isReadOnly ? 'View team members and their information' : 'Manage your team members and their information'}
           </p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button variant="default" size="lg" className="w-full sm:w-auto">
-              <Plus className="h-5 w-5 mr-2" />
-              Add Staff
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Add New Staff Member</DialogTitle>
-            </DialogHeader>
-            {formContent}
-          </DialogContent>
-        </Dialog>
+        {!isReadOnly && (
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="default" size="lg" className="w-full sm:w-auto">
+                <Plus className="h-5 w-5 mr-2" />
+                Add Staff
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Add New Staff Member</DialogTitle>
+              </DialogHeader>
+              {formContent}
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Edit Dialog */}
@@ -652,43 +658,45 @@ export default function Staff() {
             </div>
 
             {/* Actions */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-10 top-2 lg:right-12 lg:top-3 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(staff); }}>
-                  Edit Details
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={(e) => { e.stopPropagation(); toggleStatusMutation.mutate({ id: staff.id, status: staff.status }); }}
-                  className={staff.status === 'active' ? 'text-destructive' : 'text-success'}
-                >
-                  {staff.status === 'active' ? 'Deactivate' : 'Activate'}
-                </DropdownMenuItem>
-                {staff.status === 'inactive' && (
-                  <DropdownMenuItem 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(`Are you sure you want to permanently remove ${staff.name}? This action cannot be undone.`)) {
-                        deleteStaffMutation.mutate(staff.id);
-                      }
-                    }}
-                    className="text-destructive"
+            {!isReadOnly && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-10 top-2 lg:right-12 lg:top-3 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Remove Permanently
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(staff); }}>
+                    Edit Details
                   </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuItem 
+                    onClick={(e) => { e.stopPropagation(); toggleStatusMutation.mutate({ id: staff.id, status: staff.status }); }}
+                    className={staff.status === 'active' ? 'text-destructive' : 'text-success'}
+                  >
+                    {staff.status === 'active' ? 'Deactivate' : 'Activate'}
+                  </DropdownMenuItem>
+                  {staff.status === 'inactive' && (
+                    <DropdownMenuItem 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Are you sure you want to permanently remove ${staff.name}? This action cannot be undone.`)) {
+                          deleteStaffMutation.mutate(staff.id);
+                        }
+                      }}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Remove Permanently
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
             {/* Avatar & Basic Info */}
             <div className="flex items-start gap-3 lg:gap-4 mb-4">

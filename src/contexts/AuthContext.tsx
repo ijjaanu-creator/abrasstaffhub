@@ -10,9 +10,11 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isLoading: boolean;
-  /** True while we are looking up the user's app role in the database */
   isRoleLoading: boolean;
   userRole: AppRole | null;
+  isAccountant: boolean;
+  adminViewMode: boolean;
+  setAdminViewMode: (v: boolean) => void;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
   signup: (email: string, password: string, name: string, phone: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
@@ -26,6 +28,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isRoleLoading, setIsRoleLoading] = useState(false);
   const [userRole, setUserRole] = useState<AppRole | null>(null);
+  const [isAccountant, setIsAccountant] = useState(false);
+  const [adminViewMode, setAdminViewMode] = useState(false);
 
   const fetchUserRole = useCallback(async (userId: string) => {
     const timeoutMs = 5000;
@@ -52,8 +56,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const checkAccountant = useCallback(async (userId: string) => {
+    try {
+      const { data } = await supabase
+        .from('staff_members')
+        .select('position, department')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (data && data.position?.toLowerCase() === 'accountant' && data.department?.toLowerCase() === 'office') {
+        setIsAccountant(true);
+      } else {
+        setIsAccountant(false);
+      }
+    } catch {
+      setIsAccountant(false);
+    }
+  }, []);
+
   useEffect(() => {
-    // Set up auth state listener FIRST
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -61,11 +81,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        // Defer fetching role to avoid deadlock
         setTimeout(() => {
           setIsRoleLoading(true);
 
-          // Guard role fetch so UI can't get stuck
           const roleWatchdog = setTimeout(() => {
             setUserRole(null);
             setIsRoleLoading(false);
@@ -79,18 +97,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               clearTimeout(roleWatchdog);
               setIsRoleLoading(false);
             });
+
+          checkAccountant(session.user.id);
         }, 0);
       } else {
         setUserRole(null);
         setIsRoleLoading(false);
+        setIsAccountant(false);
+        setAdminViewMode(false);
       }
 
       setIsLoading(false);
     });
 
-    // THEN check for existing session
     (async () => {
-      // Guard against rare cases where getSession never resolves (storage/network issues)
       const watchdog = setTimeout(() => {
         setIsLoading(false);
       }, 7000);
@@ -121,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           try {
             await fetchUserRole(session.user.id);
+            await checkAccountant(session.user.id);
           } finally {
             clearTimeout(roleWatchdog);
             setIsRoleLoading(false);
@@ -130,7 +151,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsRoleLoading(false);
         }
       } catch {
-        // If anything goes wrong (network/storage), don't block the UI forever
         setSession(null);
         setUser(null);
         setUserRole(null);
@@ -142,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
 
     return () => subscription.unsubscribe();
-  }, [fetchUserRole]);
+  }, [fetchUserRole, checkAccountant]);
 
   const login = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
     const { error } = await supabase.auth.signInWithPassword({
@@ -163,7 +183,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     name: string, 
     phone: string
   ): Promise<{ error: string | null }> => {
-    // Use secure RPC function to validate phone without exposing staff data
     const { data: validationResult, error: validationError } = await supabase
       .rpc('validate_staff_signup', { _phone: phone });
 
@@ -184,7 +203,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const staffMemberId = staffData.staff_id;
 
-    // Sign up the user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -202,7 +220,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (authData.user) {
-      // Link the staff member to the new user using secure function (bypasses RLS)
       const { error: linkError } = await supabase.rpc('link_staff_to_user', {
         _staff_id: staffMemberId,
         _user_id: authData.user.id,
@@ -213,7 +230,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('Error linking staff member:', linkError);
       }
 
-      // Add staff role
       const { error: roleError } = await supabase
         .from('user_roles')
         .insert({ user_id: authData.user.id, role: 'staff' });
@@ -231,6 +247,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setSession(null);
     setUserRole(null);
+    setIsAccountant(false);
+    setAdminViewMode(false);
   }, []);
 
   const value: AuthContextType = {
@@ -241,6 +259,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     isRoleLoading,
     userRole,
+    isAccountant,
+    adminViewMode,
+    setAdminViewMode,
     login,
     signup,
     logout,
