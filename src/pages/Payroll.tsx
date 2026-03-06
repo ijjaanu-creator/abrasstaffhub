@@ -350,7 +350,16 @@ export default function Payroll() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-right font-semibold text-foreground">
-                      ₹{record.net_salary?.toLocaleString()}
+                      {record.payment_mode === 'advance' ? (
+                        <div>
+                          <p>₹{record.advance_amount?.toLocaleString()}</p>
+                          {record.remaining_amount > 0 && (
+                            <p className="text-xs font-normal text-warning">₹{record.remaining_amount?.toLocaleString()} pending</p>
+                          )}
+                        </div>
+                      ) : (
+                        <>₹{record.net_salary?.toLocaleString()}</>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div
