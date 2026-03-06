@@ -31,6 +31,8 @@ export default function Payroll() {
   const [showPayDialog, setShowPayDialog] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isAdmin, isAccountant, adminViewMode } = useAuth();
+  const isReadOnly = !isAdmin && isAccountant && adminViewMode;
 
   const { data: payrollRecords = [], isLoading } = useQuery({
     queryKey: ['payroll-records'],
