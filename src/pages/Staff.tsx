@@ -494,6 +494,9 @@ export default function Staff() {
     );
   }
 
+  const { isAdmin, isAccountant, adminViewMode } = useAuth();
+  const isReadOnly = !isAdmin && isAccountant && adminViewMode;
+
   return (
     <div className="space-y-6 lg:space-y-8">
       {/* Header */}
@@ -501,23 +504,25 @@ export default function Staff() {
         <div>
           <h1 className="font-display text-2xl lg:text-3xl font-bold text-foreground">Staff Directory</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage your team members and their information
+            {isReadOnly ? 'View team members and their information' : 'Manage your team members and their information'}
           </p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button variant="default" size="lg" className="w-full sm:w-auto">
-              <Plus className="h-5 w-5 mr-2" />
-              Add Staff
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Add New Staff Member</DialogTitle>
-            </DialogHeader>
-            {formContent}
-          </DialogContent>
-        </Dialog>
+        {!isReadOnly && (
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="default" size="lg" className="w-full sm:w-auto">
+                <Plus className="h-5 w-5 mr-2" />
+                Add Staff
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Add New Staff Member</DialogTitle>
+              </DialogHeader>
+              {formContent}
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Edit Dialog */}
