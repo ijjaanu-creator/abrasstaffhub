@@ -386,32 +386,44 @@ export default function Payroll() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {!isReadOnly && record.status === 'pending' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => updateStatusMutation.mutate({ id: record.id, status: 'processed' })}
-                        >
-                          Process
-                        </Button>
-                      )}
-                      {!isReadOnly && record.status === 'processed' && (
+                      {!isReadOnly && record.payment_mode === 'advance' && Number(record.remaining_amount) > 0 && record.status !== 'paid' ? (
                         <Button
                           variant="default"
                           size="sm"
-                          onClick={() => updateStatusMutation.mutate({ 
-                            id: record.id, 
-                            status: 'paid',
-                            paymentDate: new Date().toISOString().split('T')[0]
-                          })}
+                          onClick={() => setShowPayDialog(true)}
                         >
-                          Pay
+                          Pay Balance
                         </Button>
-                      )}
-                      {record.status === 'paid' && (
-                        <span className="text-xs text-muted-foreground">
-                          Paid on {record.payment_date ? new Date(record.payment_date).toLocaleDateString() : '-'}
-                        </span>
+                      ) : (
+                        <>
+                          {!isReadOnly && record.status === 'pending' && record.payment_mode !== 'advance' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateStatusMutation.mutate({ id: record.id, status: 'processed' })}
+                            >
+                              Process
+                            </Button>
+                          )}
+                          {!isReadOnly && record.status === 'processed' && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => updateStatusMutation.mutate({ 
+                                id: record.id, 
+                                status: 'paid',
+                                paymentDate: new Date().toISOString().split('T')[0]
+                              })}
+                            >
+                              Pay
+                            </Button>
+                          )}
+                          {record.status === 'paid' && (
+                            <span className="text-xs text-muted-foreground">
+                              Paid on {record.payment_date ? new Date(record.payment_date).toLocaleDateString() : '-'}
+                            </span>
+                          )}
+                        </>
                       )}
                     </td>
                   </tr>
