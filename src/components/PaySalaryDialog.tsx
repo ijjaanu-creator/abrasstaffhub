@@ -68,23 +68,21 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
     enabled: open,
   });
 
-  // Fetch pending balance records for the selected staff
+  // Fetch pending balance records for the selected staff (always fetch when staff selected)
   const { data: pendingBalanceRecords = [] } = useQuery({
-    queryKey: ['pending-balance-records', selectedStaffId, month, year],
+    queryKey: ['pending-balance-records', selectedStaffId],
     queryFn: async () => {
       if (!selectedStaffId) return [];
       const { data, error } = await supabase
         .from('payroll_records')
         .select('*')
         .eq('staff_id', selectedStaffId)
-        .eq('month', month)
-        .eq('year', parseInt(year))
         .eq('payment_mode', 'advance')
         .gt('remaining_amount', 0);
       if (error) throw error;
       return data || [];
     },
-    enabled: open && paymentMode === 'balance' && !!selectedStaffId,
+    enabled: open && !!selectedStaffId,
   });
 
   const selectedStaff = staffMembers.find(s => s.id === selectedStaffId);

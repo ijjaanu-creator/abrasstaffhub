@@ -594,6 +594,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_office_accountant: { Args: { _user_id: string }; Returns: boolean }
       link_staff_to_user: {
         Args: { _email: string; _staff_id: string; _user_id: string }
         Returns: boolean
