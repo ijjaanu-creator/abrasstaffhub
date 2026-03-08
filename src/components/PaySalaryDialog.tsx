@@ -245,6 +245,7 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
     setMarkAsPaid(true);
     setPaymentMode('full');
     setAdvanceAmount('');
+    setBalanceAmount('');
     setNotes('');
   };
 
