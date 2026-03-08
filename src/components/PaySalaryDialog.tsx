@@ -428,6 +428,31 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
             </div>
           )}
 
+          {/* Balance Amount Input */}
+          {paymentMode === 'balance' && pendingBalance > 0 && (
+            <div className="space-y-2">
+              <Label>Balance Amount (₹)</Label>
+              <Input
+                type="number"
+                value={balanceAmount}
+                onChange={(e) => setBalanceAmount(e.target.value)}
+                min="0"
+                max={pendingBalance}
+                placeholder={`Full balance: ₹${pendingBalance.toLocaleString()}`}
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave empty to pay full balance of ₹{pendingBalance.toLocaleString()}
+              </p>
+              {parseFloat(balanceAmount) > 0 && parseFloat(balanceAmount) < pendingBalance && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Wallet className="h-3 w-3" />
+                  <span>Paying ₹{parseFloat(balanceAmount).toLocaleString()}</span>
+                  <ArrowRight className="h-3 w-3" />
+                  <span className="text-warning">₹{(pendingBalance - parseFloat(balanceAmount)).toLocaleString()} still pending</span>
+                </div>
+              )}
+            </div>
+
           {/* Notes for advance/balance */}
           {(paymentMode === 'advance' || paymentMode === 'balance') && (
             <div className="space-y-2">
