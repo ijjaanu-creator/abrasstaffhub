@@ -244,8 +244,8 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
   const netSalary = calculateNetSalary();
   const advanceAmt = parseFloat(advanceAmount) || 0;
   const hasExistingPendingBalance = paymentType === 'individual' && pendingBalance > 0;
-  const maxAdvanceAmount = paymentMode === 'advance' && hasExistingPendingBalance ? pendingBalance : netSalary;
-  const remainingAmount = paymentMode === 'advance' ? maxAdvanceAmount - advanceAmt : 0;
+  const maxAdvanceAmount = netSalary;
+  const remainingAmount = paymentMode === 'advance' ? netSalary - advanceAmt : 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
