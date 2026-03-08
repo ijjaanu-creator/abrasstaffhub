@@ -566,7 +566,7 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
             disabled={
               createPayrollMutation.isPending || 
               (paymentType === 'individual' && !selectedStaffId) ||
-              (paymentMode === 'advance' && (advanceAmt <= 0 || advanceAmt > netSalary)) ||
+              (paymentMode === 'advance' && (advanceAmt <= 0 || advanceAmt > maxAdvanceAmount)) ||
               (paymentMode === 'balance' && pendingBalance === 0)
             }
           >
