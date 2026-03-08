@@ -51,6 +51,7 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
   const [markAsPaid, setMarkAsPaid] = useState(true);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('full');
   const [advanceAmount, setAdvanceAmount] = useState('');
+  const [balanceAmount, setBalanceAmount] = useState('');
   const [notes, setNotes] = useState('');
 
   // Fetch active staff members
