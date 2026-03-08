@@ -448,10 +448,10 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
                 value={advanceAmount}
                 onChange={(e) => setAdvanceAmount(e.target.value)}
                 min="0"
-                max={netSalary}
-                placeholder={`Max: ₹${netSalary.toLocaleString()}`}
+                max={maxAdvanceAmount}
+                placeholder={`Max: ₹${maxAdvanceAmount.toLocaleString()}`}
               />
-              {advanceAmt > 0 && advanceAmt <= netSalary && (
+              {advanceAmt > 0 && advanceAmt <= maxAdvanceAmount && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Wallet className="h-3 w-3" />
                   <span>Paying ₹{advanceAmt.toLocaleString()}</span>
