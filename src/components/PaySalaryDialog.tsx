@@ -108,34 +108,54 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
 
       // Handle balance payment (pay remaining amount from previous advance)
       if (paymentMode === 'balance' && pendingBalanceRecords.length > 0) {
-        for (const record of pendingBalanceRecords) {
-          // Update the original payroll record
+        const balanceAmt = parseFloat(balanceAmount) || pendingBalance;
+        
+        if (balanceAmt <= 0) {
+          throw new Error('Enter a valid balance amount');
+        }
+        if (balanceAmt > pendingBalance) {
+          throw new Error(`Amount cannot exceed pending balance of ₹${pendingBalance.toLocaleString()}`);
+        }
+
+        let remainingToAllocate = balanceAmt;
+        const sortedRecords = [...pendingBalanceRecords].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+
+        for (const record of sortedRecords) {
+          if (remainingToAllocate <= 0) break;
+          const currentRemaining = Number(record.remaining_amount || 0);
+          if (currentRemaining <= 0) continue;
+
+          const appliedAmount = Math.min(currentRemaining, remainingToAllocate);
+          const newRemaining = currentRemaining - appliedAmount;
+
           const { error: updateError } = await supabase
             .from('payroll_records')
             .update({
-              status: 'paid',
-              remaining_amount: 0,
-              payment_date: paymentDate,
+              status: newRemaining === 0 ? 'paid' : 'pending',
+              remaining_amount: newRemaining,
+              payment_date: newRemaining === 0 ? paymentDate : record.payment_date,
             })
             .eq('id', record.id);
 
           if (updateError) throw updateError;
 
-          // Create balance payment record
           const { error: advanceError } = await supabase
             .from('salary_advances')
             .insert({
               payroll_id: record.id,
               staff_id: record.staff_id,
-              amount: Number(record.remaining_amount),
+              amount: appliedAmount,
               payment_date: paymentDate,
               payment_type: 'balance',
               notes: notes || `Balance payment for ${month} ${year}`,
             });
 
           if (advanceError) throw advanceError;
+          remainingToAllocate -= appliedAmount;
         }
-        return pendingBalanceRecords.length;
+        return sortedRecords.length;
       }
 
       const records = staffToProcess.map(staff => {
