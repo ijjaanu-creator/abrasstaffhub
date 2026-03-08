@@ -216,7 +216,7 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
       const message = paymentMode === 'advance' 
         ? `Advance of ₹${parseFloat(advanceAmount).toLocaleString()} paid. Balance pending.`
         : paymentMode === 'balance'
-        ? `Balance payment of ₹${pendingBalance.toLocaleString()} completed.`
+        ? `Balance payment of ₹${(parseFloat(balanceAmount) || pendingBalance).toLocaleString()} completed.`
         : `Created ${count} payroll record${count > 1 ? 's' : ''}.`;
       
       toast({ 
