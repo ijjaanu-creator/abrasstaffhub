@@ -101,8 +101,9 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
       const bonusAmount = parseFloat(bonus) || 0;
       const deductionsAmount = parseFloat(deductions) || 0;
       const yearNum = parseInt(year);
-      const status = markAsPaid ? 'paid' : 'pending';
-      const paymentDate = markAsPaid ? format(new Date(), 'yyyy-MM-dd') : null;
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const paymentDate = paymentMode === 'full' ? (markAsPaid ? today : null) : today;
+      const status = paymentMode === 'full' ? (markAsPaid ? 'paid' : 'pending') : 'pending';
 
       // Handle balance payment (pay remaining amount from previous advance)
       if (paymentMode === 'balance' && pendingBalanceRecords.length > 0) {
@@ -134,6 +135,62 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
           if (advanceError) throw advanceError;
         }
         return pendingBalanceRecords.length;
+      }
+
+      // Handle additional advance payments against existing pending balances
+      if (paymentMode === 'advance' && paymentType === 'individual' && pendingBalanceRecords.length > 0) {
+        const requestedAdvance = parseFloat(advanceAmount) || 0;
+
+        if (requestedAdvance <= 0) {
+          throw new Error('Enter a valid advance amount');
+        }
+
+        if (requestedAdvance > pendingBalance) {
+          throw new Error(`Advance cannot exceed pending balance of ₹${pendingBalance.toLocaleString()}`);
+        }
+
+        let remainingToAllocate = requestedAdvance;
+        const sortedPendingRecords = [...pendingBalanceRecords].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+
+        for (const record of sortedPendingRecords) {
+          if (remainingToAllocate <= 0) break;
+
+          const currentRemaining = Number(record.remaining_amount || 0);
+          if (currentRemaining <= 0) continue;
+
+          const appliedAmount = Math.min(currentRemaining, remainingToAllocate);
+          const newRemaining = currentRemaining - appliedAmount;
+
+          const { error: updateError } = await supabase
+            .from('payroll_records')
+            .update({
+              remaining_amount: newRemaining,
+              status: newRemaining === 0 ? 'paid' : 'pending',
+              payment_date: newRemaining === 0 ? paymentDate : record.payment_date,
+            })
+            .eq('id', record.id);
+
+          if (updateError) throw updateError;
+
+          const { error: advanceError } = await supabase
+            .from('salary_advances')
+            .insert({
+              payroll_id: record.id,
+              staff_id: record.staff_id,
+              amount: appliedAmount,
+              payment_date: paymentDate,
+              payment_type: 'advance',
+              notes: notes || `Additional advance payment for ${month} ${year}`,
+            });
+
+          if (advanceError) throw advanceError;
+
+          remainingToAllocate -= appliedAmount;
+        }
+
+        return 1;
       }
 
       const records = staffToProcess.map(staff => {
