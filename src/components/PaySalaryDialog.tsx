@@ -452,6 +452,7 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
                 </div>
               )}
             </div>
+          )}
 
           {/* Notes for advance/balance */}
           {(paymentMode === 'advance' || paymentMode === 'balance') && (
