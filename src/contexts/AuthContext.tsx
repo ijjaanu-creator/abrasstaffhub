@@ -84,21 +84,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setTimeout(() => {
           setIsRoleLoading(true);
 
-          const roleWatchdog = setTimeout(() => {
-            setUserRole(null);
-            setIsRoleLoading(false);
-          }, 7000);
-
-          fetchUserRole(session.user.id)
+          Promise.race([
+            Promise.all([
+              fetchUserRole(session.user.id),
+              checkAccountant(session.user.id),
+            ]),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('role timeout')), 3000)
+            ),
+          ])
             .catch(() => {
               setUserRole(null);
             })
             .finally(() => {
-              clearTimeout(roleWatchdog);
               setIsRoleLoading(false);
             });
-
-          checkAccountant(session.user.id);
         }, 0);
       } else {
         setUserRole(null);
