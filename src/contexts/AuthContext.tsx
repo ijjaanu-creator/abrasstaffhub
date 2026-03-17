@@ -113,19 +113,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       const watchdog = setTimeout(() => {
         setIsLoading(false);
-      }, 7000);
-
-      const getSessionWithTimeout = async () => {
-        return await Promise.race([
-          supabase.auth.getSession(),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('getSession timeout')), 5000)
-          ),
-        ]);
-      };
+      }, 3000);
 
       try {
-        const { data } = await getSessionWithTimeout();
+        const { data } = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('getSession timeout')), 2500)
+          ),
+        ]);
         const session = data.session;
 
         setSession(session);
@@ -134,16 +130,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           setIsRoleLoading(true);
 
-          const roleWatchdog = setTimeout(() => {
-            setUserRole(null);
-            setIsRoleLoading(false);
-          }, 7000);
-
           try {
-            await fetchUserRole(session.user.id);
-            await checkAccountant(session.user.id);
+            await Promise.race([
+              Promise.all([
+                fetchUserRole(session.user.id),
+                checkAccountant(session.user.id),
+              ]),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('role timeout')), 3000)
+              ),
+            ]);
+          } catch {
+            setUserRole(null);
           } finally {
-            clearTimeout(roleWatchdog);
             setIsRoleLoading(false);
           }
         } else {
