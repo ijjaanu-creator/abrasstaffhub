@@ -106,7 +106,7 @@ const ResetPassword = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
-          <BrandLogo size="lg" />
+          <BrandLogo size={60} />
           <h1 className="text-2xl font-bold text-foreground">Set New Password</h1>
           <p className="text-muted-foreground">Enter your new password below</p>
         </div>
