@@ -20,6 +20,7 @@ import MySalary from "./pages/MySalary";
 import Profile from "./pages/Profile";
 import StaffVerify from "./pages/StaffVerify";
 import GetAbras from "./pages/GetAbras";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => (
             <Route path="/signup" element={<Signup />} />
             <Route path="/verify" element={<StaffVerify />} />
             <Route path="/get-abras" element={<GetAbras />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/staff" element={<Staff />} />
