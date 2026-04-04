@@ -243,7 +243,7 @@ export default function Login() {
     setIsResetting(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
-        redirectTo: `${window.location.origin}/login`,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
       
       if (error) {

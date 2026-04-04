@@ -20,6 +20,7 @@ import MySalary from "./pages/MySalary";
 import Profile from "./pages/Profile";
 import StaffVerify from "./pages/StaffVerify";
 import GetAbras from "./pages/GetAbras";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
