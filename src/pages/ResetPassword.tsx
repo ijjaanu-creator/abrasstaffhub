@@ -86,7 +86,7 @@ const ResetPassword = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="w-full max-w-md text-center space-y-4">
-          <BrandLogo size="lg" />
+          <BrandLogo size={60} />
           <h1 className="text-xl font-bold text-foreground">Verifying reset link...</h1>
           <p className="text-muted-foreground">
             If you're not redirected, the link may have expired.{' '}
