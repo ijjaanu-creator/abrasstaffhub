@@ -110,6 +110,7 @@ export default function Profile() {
       if (updateError) throw updateError;
 
       queryClient.invalidateQueries({ queryKey: ['my-profile'] });
+      queryClient.invalidateQueries({ queryKey: ['verify-staff-profile'] });
       toast({ title: 'Avatar updated successfully' });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
