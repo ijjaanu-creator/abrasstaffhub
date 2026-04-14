@@ -64,7 +64,10 @@ export default function Profile() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-profile'] });
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['my-profile', user.id] });
+        queryClient.invalidateQueries({ queryKey: ['verify-staff-profile', user.id] });
+      }
       toast({ title: 'Profile updated successfully' });
       setIsEditing(false);
     },
@@ -102,15 +105,19 @@ export default function Profile() {
         .from('avatars')
         .getPublicUrl(filePath);
 
+      const avatarUrl = `${publicUrl}?t=${Date.now()}`;
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ avatar_url: `${publicUrl}?t=${Date.now()}` })
+        .update({ avatar_url: avatarUrl })
         .eq('id', user.id);
 
       if (updateError) throw updateError;
 
-      queryClient.invalidateQueries({ queryKey: ['my-profile'] });
-      queryClient.invalidateQueries({ queryKey: ['verify-staff-profile'] });
+      queryClient.setQueryData(['my-profile', user.id], (oldData: any) =>
+        oldData ? { ...oldData, avatar_url: avatarUrl } : oldData
+      );
+      queryClient.invalidateQueries({ queryKey: ['my-profile', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['verify-staff-profile', user.id] });
       toast({ title: 'Avatar updated successfully' });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
