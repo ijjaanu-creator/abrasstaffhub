@@ -375,7 +375,7 @@ export default function Profile() {
               {/* Front of Card */}
               <div
                 ref={idCardFrontRef}
-                className={`absolute inset-0 [backface-visibility:hidden] overflow-hidden rounded-2xl bg-white p-0 shadow-xl ${isFlipped ? 'invisible' : ''}`}
+                className={`absolute inset-0 [backface-visibility:hidden] rounded-2xl bg-white p-0 shadow-xl ${isFlipped ? 'invisible' : ''}`}
               >
                 {/* Holi powder splashes */}
                 <div className="absolute -top-8 -left-8 w-32 h-32 rounded-full bg-gradient-radial from-pink-400/60 via-pink-300/30 to-transparent blur-xl" />
@@ -502,7 +502,7 @@ export default function Profile() {
               {/* Back of Card */}
               <div
                 ref={idCardBackRef}
-                className={`absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-hidden rounded-2xl bg-white p-0 shadow-xl ${!isFlipped ? 'invisible' : ''}`}
+                className={`absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] rounded-2xl bg-white p-0 shadow-xl ${!isFlipped ? 'invisible' : ''}`}
               >
                 {/* Holi powder splashes */}
                 <div className="absolute -top-6 right-4 w-28 h-28 rounded-full bg-gradient-radial from-purple-400/60 via-purple-300/30 to-transparent blur-xl" />
