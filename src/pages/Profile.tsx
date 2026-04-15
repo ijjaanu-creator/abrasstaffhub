@@ -132,13 +132,25 @@ export default function Profile() {
 
     setIsDownloading(true);
     try {
-      // Capture front side
-      const frontCanvas = await html2canvas(idCardFrontRef.current, {
+      // Temporarily expand the front card to its full scrollable height for capture
+      const frontElement = idCardFrontRef.current;
+      const frontParent = frontElement.parentElement?.parentElement;
+      const origParentHeight = frontParent?.style.height || '';
+      const origFrontOverflow = frontElement.style.overflow;
+      if (frontParent) frontParent.style.height = 'auto';
+      frontElement.style.overflow = 'visible';
+
+      const frontCanvas = await html2canvas(frontElement, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: null,
+        backgroundColor: '#ffffff',
+        scrollY: -window.scrollY,
       });
+
+      // Restore front
+      if (frontParent) frontParent.style.height = origParentHeight;
+      frontElement.style.overflow = origFrontOverflow;
 
       // Temporarily remove the rotateY transform and visibility restrictions for capturing the back side
       const backElement = idCardBackRef.current;
@@ -171,7 +183,8 @@ export default function Profile() {
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: null,
+        backgroundColor: '#ffffff',
+        scrollY: -window.scrollY,
       });
       
       // Restore original styles
@@ -352,7 +365,7 @@ export default function Profile() {
       {staffMember && (
         <div className="space-y-3">
           <div 
-            className="relative [perspective:1000px] h-[320px] sm:h-[280px]"
+            className="relative [perspective:1000px] h-[420px] sm:h-[320px]"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
@@ -362,7 +375,7 @@ export default function Profile() {
               {/* Front of Card */}
               <div
                 ref={idCardFrontRef}
-                className={`absolute inset-0 [backface-visibility:hidden] overflow-hidden rounded-2xl bg-white p-0 shadow-xl ${isFlipped ? 'invisible' : ''}`}
+                className={`absolute inset-0 [backface-visibility:hidden] rounded-2xl bg-white p-0 shadow-xl ${isFlipped ? 'invisible' : ''}`}
               >
                 {/* Holi powder splashes */}
                 <div className="absolute -top-8 -left-8 w-32 h-32 rounded-full bg-gradient-radial from-pink-400/60 via-pink-300/30 to-transparent blur-xl" />
@@ -489,7 +502,7 @@ export default function Profile() {
               {/* Back of Card */}
               <div
                 ref={idCardBackRef}
-                className={`absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-hidden rounded-2xl bg-white p-0 shadow-xl ${!isFlipped ? 'invisible' : ''}`}
+                className={`absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] rounded-2xl bg-white p-0 shadow-xl ${!isFlipped ? 'invisible' : ''}`}
               >
                 {/* Holi powder splashes */}
                 <div className="absolute -top-6 right-4 w-28 h-28 rounded-full bg-gradient-radial from-purple-400/60 via-purple-300/30 to-transparent blur-xl" />
