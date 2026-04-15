@@ -88,7 +88,26 @@ export default function Staff() {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data;
+
+      // Fetch profile avatars for staff with user_ids
+      const userIds = data.filter(s => s.user_id).map(s => s.user_id!);
+      let avatarMap: Record<string, string> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, avatar_url')
+          .in('id', userIds);
+        if (profiles) {
+          avatarMap = Object.fromEntries(
+            profiles.filter(p => p.avatar_url).map(p => [p.id, p.avatar_url!])
+          );
+        }
+      }
+
+      return data.map(s => ({
+        ...s,
+        avatar_url: s.user_id ? avatarMap[s.user_id] || null : null,
+      }));
     },
   });
 
@@ -700,9 +719,17 @@ export default function Staff() {
 
             {/* Avatar & Basic Info */}
             <div className="flex items-start gap-3 lg:gap-4 mb-4">
-              <div className="flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-xl gradient-primary text-primary-foreground font-display text-lg lg:text-xl font-bold">
-                {staff.name.charAt(0)}
-              </div>
+              {staff.avatar_url ? (
+                <img
+                  src={staff.avatar_url}
+                  alt={staff.name}
+                  className="h-12 w-12 lg:h-14 lg:w-14 rounded-xl object-cover flex-shrink-0"
+                />
+              ) : (
+                <div className="flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-xl gradient-primary text-primary-foreground font-display text-lg lg:text-xl font-bold flex-shrink-0">
+                  {staff.name.charAt(0)}
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-foreground truncate">{staff.name}</h3>
                 <p className="text-sm text-muted-foreground truncate">{staff.position}</p>
