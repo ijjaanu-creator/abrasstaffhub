@@ -19,6 +19,11 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const isEmbedded = window.top !== window.self;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+  const isStandalonePWA =
+    (window.matchMedia?.('(display-mode: standalone)').matches) ||
+    (navigator as any).standalone === true;
+  const isIOSPWA = isIOS && isStandalonePWA;
   const { toast } = useToast();
 
   const stopCamera = useCallback(() => {
