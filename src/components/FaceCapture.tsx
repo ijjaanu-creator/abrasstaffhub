@@ -271,7 +271,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
                     )}
                   </div>
                   <div className="w-full flex flex-col gap-2">
-                    <Button onClick={startCamera} disabled={isStarting}>
+                    <Button type="button" onClick={startCamera} disabled={isStarting}>
                       {isStarting ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       ) : (
