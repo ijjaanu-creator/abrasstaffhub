@@ -335,11 +335,11 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
       <div className="p-4 border-t border-border">
         {capturedImage ? (
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={retake} disabled={isProcessing}>
+            <Button type="button" variant="outline" className="flex-1" onClick={retake} disabled={isProcessing}>
               <RotateCcw className="h-4 w-4 mr-2" />
               Retake
             </Button>
-            <Button className="flex-1" onClick={confirmCapture} disabled={isProcessing}>
+            <Button type="button" className="flex-1" onClick={confirmCapture} disabled={isProcessing}>
               {isProcessing ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
@@ -349,7 +349,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
             </Button>
           </div>
         ) : stream && cameraReady ? (
-          <Button className="w-full" size="lg" onClick={capturePhoto}>
+          <Button type="button" className="w-full" size="lg" onClick={capturePhoto}>
             <Camera className="h-5 w-5 mr-2" />
             Capture Photo
           </Button>
