@@ -220,7 +220,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
         <h2 className="font-display text-lg font-semibold">
           {mode === 'enroll' ? 'Register Your Face' : 'Verify Your Face'}
         </h2>
-        <Button variant="ghost" size="icon" onClick={handleCancel} disabled={isProcessing}>
+        <Button type="button" variant="ghost" size="icon" onClick={handleCancel} disabled={isProcessing}>
           <X className="h-5 w-5" />
         </Button>
       </div>
@@ -271,7 +271,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
                     )}
                   </div>
                   <div className="w-full flex flex-col gap-2">
-                    <Button onClick={startCamera} disabled={isStarting}>
+                    <Button type="button" onClick={startCamera} disabled={isStarting}>
                       {isStarting ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       ) : (
@@ -304,7 +304,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
                     )}
                   </div>
                   <div className="w-full max-w-xs flex flex-col gap-2">
-                    <Button variant="outline" onClick={stopCamera}>
+                    <Button type="button" variant="outline" onClick={stopCamera}>
                       Cancel
                     </Button>
                     {isEmbedded && (
@@ -335,11 +335,11 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
       <div className="p-4 border-t border-border">
         {capturedImage ? (
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={retake} disabled={isProcessing}>
+            <Button type="button" variant="outline" className="flex-1" onClick={retake} disabled={isProcessing}>
               <RotateCcw className="h-4 w-4 mr-2" />
               Retake
             </Button>
-            <Button className="flex-1" onClick={confirmCapture} disabled={isProcessing}>
+            <Button type="button" className="flex-1" onClick={confirmCapture} disabled={isProcessing}>
               {isProcessing ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
@@ -349,7 +349,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
             </Button>
           </div>
         ) : stream && cameraReady ? (
-          <Button className="w-full" size="lg" onClick={capturePhoto}>
+          <Button type="button" className="w-full" size="lg" onClick={capturePhoto}>
             <Camera className="h-5 w-5 mr-2" />
             Capture Photo
           </Button>
