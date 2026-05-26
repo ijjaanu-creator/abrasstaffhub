@@ -304,7 +304,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
                     )}
                   </div>
                   <div className="w-full max-w-xs flex flex-col gap-2">
-                    <Button variant="outline" onClick={stopCamera}>
+                    <Button type="button" variant="outline" onClick={stopCamera}>
                       Cancel
                     </Button>
                     {isEmbedded && (
