@@ -269,6 +269,11 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
                   <div>
                     <p className="font-medium text-foreground">Camera not started</p>
                     <p className="text-sm text-muted-foreground mt-1">Position your face within the oval guide</p>
+                    {isIOSPWA && (
+                      <p className="text-xs text-warning mt-2 break-words">
+                        On iPhone, the installed app may close when the camera prompt appears. If that happens, tap "Open in Safari" below, allow camera once, then return to the installed app.
+                      </p>
+                    )}
                     {cameraError && (
                       <p className="text-xs text-muted-foreground mt-2 break-words">
                         {cameraError}
@@ -284,13 +289,13 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
                       )}
                       Start Camera
                     </Button>
-                    {isEmbedded && (
+                    {(isEmbedded || isIOSPWA) && (
                       <Button
                         type="button"
                         variant="outline"
                         onClick={() => window.open(window.location.href, '_blank', 'noopener,noreferrer')}
                       >
-                        Open in new tab
+                        {isIOSPWA ? 'Open in Safari' : 'Open in new tab'}
                       </Button>
                     )}
                   </div>
