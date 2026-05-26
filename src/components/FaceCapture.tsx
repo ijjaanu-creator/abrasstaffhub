@@ -220,7 +220,7 @@ export function FaceCapture({ onCapture, onCancel, mode, isProcessing = false }:
         <h2 className="font-display text-lg font-semibold">
           {mode === 'enroll' ? 'Register Your Face' : 'Verify Your Face'}
         </h2>
-        <Button variant="ghost" size="icon" onClick={handleCancel} disabled={isProcessing}>
+        <Button type="button" variant="ghost" size="icon" onClick={handleCancel} disabled={isProcessing}>
           <X className="h-5 w-5" />
         </Button>
       </div>
