@@ -303,9 +303,16 @@ export default function Payroll() {
                     {record.payment_mode === 'advance' ? 'Advance Paid' : 'Net Salary'}
                   </p>
                   <p className="font-medium text-primary">
-                    ₹{(record.payment_mode === 'advance' ? record.advance_amount : record.net_salary)?.toLocaleString()}
+                    ₹{(record.payment_mode === 'advance' ? record.advance_amount : record._net)?.toLocaleString()}
                   </p>
                 </div>
+                {record._absentDays > 0 && record.payment_mode !== 'advance' && (
+                  <div className="col-span-2">
+                    <p className="text-muted-foreground text-xs">Absence Deduction</p>
+                    <p className="font-medium text-destructive">−₹{record._absenceDeduction.toLocaleString()} ({record._absentDays} day{record._absentDays === 1 ? '' : 's'})</p>
+                  </div>
+                )}
+
                 {record.payment_mode === 'advance' && record.remaining_amount > 0 && (
                   <div className="col-span-2">
                     <p className="text-muted-foreground text-xs">Remaining Balance</p>
