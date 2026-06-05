@@ -86,8 +86,73 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
     enabled: open && !!selectedStaffId,
   });
 
+  // Compute date range for selected month/year
+  const monthIndex = months.indexOf(month);
+  const yearNum = parseInt(year) || currentDate.getFullYear();
+  const startDate = new Date(yearNum, monthIndex, 1);
+  const endDate = new Date(yearNum, monthIndex + 1, 0);
+  const daysInMonth = endDate.getDate();
+  const startStr = format(startDate, 'yyyy-MM-dd');
+  const endStr = format(endDate, 'yyyy-MM-dd');
+
+  // Fetch holidays in the selected month
+  const { data: monthHolidays = [] } = useQuery({
+    queryKey: ['holidays-in-month', startStr, endStr],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('holidays')
+        .select('date')
+        .gte('date', startStr)
+        .lte('date', endStr);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  // Fetch absent attendance for the selected month (all active staff)
+  const { data: monthAbsences = [] } = useQuery({
+    queryKey: ['month-absences', startStr, endStr],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .select('staff_id, date, status')
+        .gte('date', startStr)
+        .lte('date', endStr)
+        .eq('status', 'absent');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  // Count non-working days in the month (Sundays + holidays)
+  const holidayDates = new Set(monthHolidays.map((h: any) => h.date));
+  let nonWorkingDays = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(yearNum, monthIndex, d);
+    const dateStr = format(date, 'yyyy-MM-dd');
+    if (date.getDay() === 0 || holidayDates.has(dateStr)) nonWorkingDays++;
+  }
+  const workingDaysInMonth = Math.max(1, daysInMonth - nonWorkingDays);
+
+  // Absence count per staff
+  const absencesByStaff = new Map<string, number>();
+  monthAbsences.forEach((a: any) => {
+    absencesByStaff.set(a.staff_id, (absencesByStaff.get(a.staff_id) || 0) + 1);
+  });
+
+  const computeAbsenceDeduction = (staffSalary: number, staffId: string) => {
+    const absentDays = absencesByStaff.get(staffId) || 0;
+    const dailyRate = staffSalary / workingDaysInMonth;
+    return Math.round(absentDays * dailyRate);
+  };
+
   const selectedStaff = staffMembers.find(s => s.id === selectedStaffId);
   const pendingBalance = pendingBalanceRecords.reduce((sum, r) => sum + Number(r.remaining_amount || 0), 0);
+  const selectedAbsentDays = selectedStaffId ? (absencesByStaff.get(selectedStaffId) || 0) : 0;
+  const selectedAbsenceDeduction = selectedStaff ? computeAbsenceDeduction(selectedStaff.salary, selectedStaff.id) : 0;
+
 
   const createPayrollMutation = useMutation({
     mutationFn: async () => {
@@ -159,7 +224,8 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
       }
 
       const records = staffToProcess.map(staff => {
-        const netSalary = staff.salary + bonusAmount - deductionsAmount;
+        const absenceDeduction = computeAbsenceDeduction(staff.salary, staff.id);
+        const netSalary = staff.salary + bonusAmount - deductionsAmount - absenceDeduction;
         const advanceAmt = paymentMode === 'advance' ? parseFloat(advanceAmount) || 0 : 0;
         const remainingAmt = paymentMode === 'advance' ? netSalary - advanceAmt : 0;
 
@@ -169,7 +235,7 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
           year: yearNum,
           base_salary: staff.salary,
           bonus: bonusAmount,
-          deductions: deductionsAmount,
+          deductions: deductionsAmount + absenceDeduction,
           overtime: 0,
           net_salary: netSalary,
           status: paymentMode === 'advance' ? 'pending' : status,
@@ -180,6 +246,7 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
           remaining_amount: remainingAmt,
         };
       });
+
 
       const { data: insertedRecords, error } = await supabase
         .from('payroll_records')
@@ -255,13 +322,15 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
     }
     if (paymentType === 'bulk') {
       const total = staffMembers.reduce((sum, s) => {
-        return sum + s.salary + (parseFloat(bonus) || 0) - (parseFloat(deductions) || 0);
+        const absDed = computeAbsenceDeduction(s.salary, s.id);
+        return sum + s.salary + (parseFloat(bonus) || 0) - (parseFloat(deductions) || 0) - absDed;
       }, 0);
       return total;
     }
     if (!selectedStaff) return 0;
-    return selectedStaff.salary + (parseFloat(bonus) || 0) - (parseFloat(deductions) || 0);
+    return selectedStaff.salary + (parseFloat(bonus) || 0) - (parseFloat(deductions) || 0) - selectedAbsenceDeduction;
   };
+
 
   const netSalary = calculateNetSalary();
   const advanceAmt = parseFloat(advanceAmount) || 0;
@@ -525,6 +594,20 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
               <span className="text-muted-foreground">Period</span>
               <span className="font-medium">{month} {year}</span>
             </div>
+            {paymentMode !== 'balance' && paymentType === 'individual' && selectedStaff && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Absence Deduction ({selectedAbsentDays} day{selectedAbsentDays === 1 ? '' : 's'} × ₹{Math.round(selectedStaff.salary / workingDaysInMonth).toLocaleString()}/day)
+                </span>
+                <span className="font-medium text-destructive">−₹{selectedAbsenceDeduction.toLocaleString()}</span>
+              </div>
+            )}
+            {paymentMode !== 'balance' && paymentType === 'individual' && selectedStaff && (
+              <p className="text-xs text-muted-foreground">
+                Working days this month: {workingDaysInMonth} (holidays & Sundays paid)
+              </p>
+            )}
+
             {paymentMode === 'advance' && advanceAmt > 0 && (
               <>
                 <div className="flex justify-between text-sm">
