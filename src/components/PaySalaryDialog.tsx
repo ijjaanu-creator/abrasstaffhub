@@ -224,7 +224,8 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
       }
 
       const records = staffToProcess.map(staff => {
-        const netSalary = staff.salary + bonusAmount - deductionsAmount;
+        const absenceDeduction = computeAbsenceDeduction(staff.salary, staff.id);
+        const netSalary = staff.salary + bonusAmount - deductionsAmount - absenceDeduction;
         const advanceAmt = paymentMode === 'advance' ? parseFloat(advanceAmount) || 0 : 0;
         const remainingAmt = paymentMode === 'advance' ? netSalary - advanceAmt : 0;
 
@@ -234,7 +235,7 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
           year: yearNum,
           base_salary: staff.salary,
           bonus: bonusAmount,
-          deductions: deductionsAmount,
+          deductions: deductionsAmount + absenceDeduction,
           overtime: 0,
           net_salary: netSalary,
           status: paymentMode === 'advance' ? 'pending' : status,
@@ -245,6 +246,7 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
           remaining_amount: remainingAmt,
         };
       });
+
 
       const { data: insertedRecords, error } = await supabase
         .from('payroll_records')
