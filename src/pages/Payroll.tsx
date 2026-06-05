@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { exportToCSV, formatPayrollForExport } from '@/lib/exportUtils';
+import { recalcNetSalary, getMonthIndex } from '@/lib/payrollCalc';
+
 import { PaySalaryDialog } from '@/components/PaySalaryDialog';
 import {
   Search,
