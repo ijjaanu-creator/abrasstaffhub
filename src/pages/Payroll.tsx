@@ -442,7 +442,7 @@ export default function Payroll() {
                           )}
                         </div>
                       ) : (
-                        <>₹{record.net_salary?.toLocaleString()}</>
+                        <>₹{record._net?.toLocaleString()}</>
                       )}
                     </td>
                     <td className="px-6 py-4">
