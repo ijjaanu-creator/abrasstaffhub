@@ -322,13 +322,15 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
     }
     if (paymentType === 'bulk') {
       const total = staffMembers.reduce((sum, s) => {
-        return sum + s.salary + (parseFloat(bonus) || 0) - (parseFloat(deductions) || 0);
+        const absDed = computeAbsenceDeduction(s.salary, s.id);
+        return sum + s.salary + (parseFloat(bonus) || 0) - (parseFloat(deductions) || 0) - absDed;
       }, 0);
       return total;
     }
     if (!selectedStaff) return 0;
-    return selectedStaff.salary + (parseFloat(bonus) || 0) - (parseFloat(deductions) || 0);
+    return selectedStaff.salary + (parseFloat(bonus) || 0) - (parseFloat(deductions) || 0) - selectedAbsenceDeduction;
   };
+
 
   const netSalary = calculateNetSalary();
   const advanceAmt = parseFloat(advanceAmount) || 0;
