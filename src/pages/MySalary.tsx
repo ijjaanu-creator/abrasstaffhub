@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
-import { Wallet, Download, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Wallet, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { recalcNetSalary, getMonthIndex } from '@/lib/payrollCalc';
 
 export default function MySalary() {
   const { user } = useAuth();
@@ -33,11 +33,64 @@ export default function MySalary() {
         .eq('staff_id', staffMember?.id)
         .eq('year', selectedYear)
         .order('month', { ascending: false });
-      
       if (error) throw error;
       return data;
     },
     enabled: !!staffMember?.id,
+  });
+
+  // Holidays for the year
+  const { data: yearHolidays = [] } = useQuery({
+    queryKey: ['year-holidays', selectedYear],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('holidays')
+        .select('date')
+        .gte('date', `${selectedYear}-01-01`)
+        .lte('date', `${selectedYear}-12-31`);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Absences for the year for this staff
+  const { data: yearAbsences = [] } = useQuery({
+    queryKey: ['my-year-absences', staffMember?.id, selectedYear],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .select('date, status')
+        .eq('staff_id', staffMember?.id)
+        .eq('status', 'absent')
+        .gte('date', `${selectedYear}-01-01`)
+        .lte('date', `${selectedYear}-12-31`);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!staffMember?.id,
+  });
+
+  const holidayDates = new Set<string>(yearHolidays.map((h: any) => h.date));
+  const absencesByMonth = new Map<number, number>();
+  yearAbsences.forEach((a: any) => {
+    const m = new Date(a.date + 'T00:00:00').getMonth();
+    absencesByMonth.set(m, (absencesByMonth.get(m) || 0) + 1);
+  });
+
+  const enrichedRecords = payrollRecords.map((r: any) => {
+    const mi = getMonthIndex(r.month);
+    const absentDays = absencesByMonth.get(mi) || 0;
+    const { net, absenceDeduction, workingDays } = recalcNetSalary({
+      baseSalary: Number(r.base_salary || 0),
+      bonus: Number(r.bonus || 0),
+      deductions: Number(r.deductions || 0),
+      storedNet: Number(r.net_salary || 0),
+      year: r.year,
+      month: r.month,
+      absentDays,
+      holidayDates,
+    });
+    return { ...r, _displayNet: net, _absenceDeduction: absenceDeduction, _absentDays: absentDays, _workingDays: workingDays };
   });
 
   const getStatusColor = (status: string) => {
@@ -62,7 +115,7 @@ export default function MySalary() {
     return <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
-  const totalPaid = payrollRecords.filter(r => r.status === 'paid').reduce((acc, r) => acc + r.net_salary, 0);
+  const totalPaid = enrichedRecords.filter(r => r.status === 'paid').reduce((acc, r) => acc + r._displayNet, 0);
 
   return (
     <div className="space-y-6">
@@ -96,12 +149,12 @@ export default function MySalary() {
 
       {/* Payroll Records */}
       <div className="rounded-xl border bg-card divide-y divide-border">
-        {payrollRecords.length === 0 ? (
+        {enrichedRecords.length === 0 ? (
           <div className="p-6 text-center text-muted-foreground">
             No payroll records for {selectedYear}
           </div>
         ) : (
-          payrollRecords.map((record) => (
+          enrichedRecords.map((record) => (
             <div key={record.id} className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -111,13 +164,13 @@ export default function MySalary() {
                   <p className="font-medium">{record.month} {record.year}</p>
                   <p className="text-sm text-muted-foreground">
                     Base: ₹{record.base_salary.toLocaleString()}
-                    {record.bonus ? ` + Bonus: ${record.bonus}` : ''}
-                    {record.deductions ? ` - Ded: ${record.deductions}` : ''}
+                    {record._absentDays > 0 ? ` • ${record._absentDays} absent (−₹${record._absenceDeduction.toLocaleString()})` : ''}
+                    {record.bonus ? ` • +₹${record.bonus}` : ''}
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="font-bold">₹{record.net_salary.toLocaleString()}</p>
+                <p className="font-bold">₹{record._displayNet.toLocaleString()}</p>
                 <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', getStatusColor(record.status))}>
                   {record.status}
                 </span>
