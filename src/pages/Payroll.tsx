@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { exportToCSV, formatPayrollForExport } from '@/lib/exportUtils';
+import { recalcNetSalary, getMonthIndex } from '@/lib/payrollCalc';
+
 import { PaySalaryDialog } from '@/components/PaySalaryDialog';
 import {
   Search,
@@ -72,18 +74,80 @@ export default function Payroll() {
     },
   });
 
-  const filteredPayroll = payrollRecords.filter(
+  // Year range covered by current records
+  const years = Array.from(new Set(payrollRecords.map((r: any) => r.year))).filter(Boolean) as number[];
+  const minYear = years.length ? Math.min(...years) : new Date().getFullYear();
+  const maxYear = years.length ? Math.max(...years) : new Date().getFullYear();
+
+  const { data: holidaysAll = [] } = useQuery({
+    queryKey: ['holidays-range', minYear, maxYear],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('holidays')
+        .select('date')
+        .gte('date', `${minYear}-01-01`)
+        .lte('date', `${maxYear}-12-31`);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: payrollRecords.length > 0,
+  });
+
+  const { data: absencesAll = [] } = useQuery({
+    queryKey: ['absences-range', minYear, maxYear],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .select('staff_id, date, status')
+        .eq('status', 'absent')
+        .gte('date', `${minYear}-01-01`)
+        .lte('date', `${maxYear}-12-31`);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: payrollRecords.length > 0,
+  });
+
+  const holidayDates = new Set<string>(holidaysAll.map((h: any) => h.date));
+  // Map key: `${staffId}|${year}|${monthIndex}` -> absent count
+  const absMap = new Map<string, number>();
+  absencesAll.forEach((a: any) => {
+    const d = new Date(a.date + 'T00:00:00');
+    const k = `${a.staff_id}|${d.getFullYear()}|${d.getMonth()}`;
+    absMap.set(k, (absMap.get(k) || 0) + 1);
+  });
+
+  const enrichRecord = (r: any) => {
+    const mi = getMonthIndex(r.month);
+    const absentDays = absMap.get(`${r.staff_id}|${r.year}|${mi}`) || 0;
+    const { net, absenceDeduction } = recalcNetSalary({
+      baseSalary: Number(r.base_salary || 0),
+      bonus: Number(r.bonus || 0),
+      deductions: Number(r.deductions || 0),
+      storedNet: Number(r.net_salary || 0),
+      year: r.year,
+      month: r.month,
+      absentDays,
+      holidayDates,
+    });
+    return { ...r, _net: net, _absenceDeduction: absenceDeduction, _absentDays: absentDays };
+  };
+
+  const enrichedPayroll = payrollRecords.map(enrichRecord);
+
+  const filteredPayroll = enrichedPayroll.filter(
     (record: any) =>
       record.staff_members?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       record.staff_members?.position?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const stats = {
-    totalPayroll: payrollRecords.reduce((sum: number, p: any) => sum + (p.net_salary || 0), 0),
-    pending: payrollRecords.filter((p: any) => p.status === 'pending').reduce((sum: number, p: any) => sum + (p.net_salary || 0), 0),
-    processed: payrollRecords.filter((p: any) => p.status === 'processed').reduce((sum: number, p: any) => sum + (p.net_salary || 0), 0),
-    paid: payrollRecords.filter((p: any) => p.status === 'paid').reduce((sum: number, p: any) => sum + (p.net_salary || 0), 0),
+    totalPayroll: enrichedPayroll.reduce((sum: number, p: any) => sum + (p._net || 0), 0),
+    pending: enrichedPayroll.filter((p: any) => p.status === 'pending').reduce((sum: number, p: any) => sum + (p._net || 0), 0),
+    processed: enrichedPayroll.filter((p: any) => p.status === 'processed').reduce((sum: number, p: any) => sum + (p._net || 0), 0),
+    paid: enrichedPayroll.filter((p: any) => p.status === 'paid').reduce((sum: number, p: any) => sum + (p._net || 0), 0),
   };
+
 
   if (isLoading) {
     return (
@@ -239,9 +303,16 @@ export default function Payroll() {
                     {record.payment_mode === 'advance' ? 'Advance Paid' : 'Net Salary'}
                   </p>
                   <p className="font-medium text-primary">
-                    ₹{(record.payment_mode === 'advance' ? record.advance_amount : record.net_salary)?.toLocaleString()}
+                    ₹{(record.payment_mode === 'advance' ? record.advance_amount : record._net)?.toLocaleString()}
                   </p>
                 </div>
+                {record._absentDays > 0 && record.payment_mode !== 'advance' && (
+                  <div className="col-span-2">
+                    <p className="text-muted-foreground text-xs">Absence Deduction</p>
+                    <p className="font-medium text-destructive">−₹{record._absenceDeduction.toLocaleString()} ({record._absentDays} day{record._absentDays === 1 ? '' : 's'})</p>
+                  </div>
+                )}
+
                 {record.payment_mode === 'advance' && record.remaining_amount > 0 && (
                   <div className="col-span-2">
                     <p className="text-muted-foreground text-xs">Remaining Balance</p>
@@ -371,7 +442,7 @@ export default function Payroll() {
                           )}
                         </div>
                       ) : (
-                        <>₹{record.net_salary?.toLocaleString()}</>
+                        <>₹{record._net?.toLocaleString()}</>
                       )}
                     </td>
                     <td className="px-6 py-4">
