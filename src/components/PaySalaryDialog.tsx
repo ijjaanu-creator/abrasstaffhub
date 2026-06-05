@@ -594,6 +594,20 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
               <span className="text-muted-foreground">Period</span>
               <span className="font-medium">{month} {year}</span>
             </div>
+            {paymentMode !== 'balance' && paymentType === 'individual' && selectedStaff && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Absence Deduction ({selectedAbsentDays} day{selectedAbsentDays === 1 ? '' : 's'} × ₹{Math.round(selectedStaff.salary / workingDaysInMonth).toLocaleString()}/day)
+                </span>
+                <span className="font-medium text-destructive">−₹{selectedAbsenceDeduction.toLocaleString()}</span>
+              </div>
+            )}
+            {paymentMode !== 'balance' && paymentType === 'individual' && selectedStaff && (
+              <p className="text-xs text-muted-foreground">
+                Working days this month: {workingDaysInMonth} (holidays & Sundays paid)
+              </p>
+            )}
+
             {paymentMode === 'advance' && advanceAmt > 0 && (
               <>
                 <div className="flex justify-between text-sm">
