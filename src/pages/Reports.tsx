@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { exportToCSV, formatAttendanceForExport, formatPayrollForExport } from '@/lib/exportUtils';
+import { generateStaffReportPDF } from '@/lib/generateStaffReportPDF';
 import {
   Dialog,
   DialogContent,
@@ -242,7 +243,20 @@ export default function Reports() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>(null);
   const [selectedStaff, setSelectedStaff] = useState<SelectedStaff | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const { toast } = useToast();
+
+  const handleDownloadPdf = async () => {
+    try {
+      setDownloadingPdf(true);
+      await generateStaffReportPDF({ selectedMonth });
+      toast({ title: 'PDF report downloaded' });
+    } catch (e: any) {
+      toast({ title: 'Failed to generate PDF', description: e?.message, variant: 'destructive' });
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   // Fetch attendance for the selected month
   const { data: attendanceData = [], isLoading: loadingAttendance } = useQuery({
@@ -407,7 +421,7 @@ export default function Reports() {
             View attendance and payroll analytics
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="relative">
             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <input
@@ -417,6 +431,14 @@ export default function Reports() {
               className="h-12 rounded-lg border border-border bg-background pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
+          <Button onClick={handleDownloadPdf} disabled={downloadingPdf} className="h-12">
+            {downloadingPdf ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            Download PDF
+          </Button>
         </div>
       </div>
 
