@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '@/integrations/supabase/client';
 import abrasLogo from '@/assets/abras-logo.png';
+import { recalcNetSalary } from './payrollCalc';
 
 interface Options {
   selectedMonth: string; // 'YYYY-MM'
