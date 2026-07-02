@@ -239,24 +239,26 @@ export async function generateStaffReportPDF({ selectedMonth }: Options) {
     doc.text(sumLines, margin, sy);
     sy += sumLines.length * 12 + 10;
 
-    // Payroll block
+    // Payroll block — always recompute from base to reflect actual absences
     const pay = payroll.find((p: any) => p.staff_id === staff.id);
     const baseSalary = Number(staff.salary || 0);
     const holidayDateSet = new Set<string>(Array.from(holidayMap.keys()) as string[]);
     const bonus = Number(pay?.bonus || 0);
+    const overtimePay = Number(pay?.overtime || 0);
     const storedDeductions = Number(pay?.deductions || 0);
-    const storedNet = pay ? Number(pay.net_salary || 0) : baseSalary + bonus - storedDeductions;
-    const { net: recalcNet, absenceDeduction, workingDays } = recalcNetSalary({
+    const { absenceDeduction, workingDays } = recalcNetSalary({
       baseSalary,
       bonus,
-      deductions: storedDeductions,
-      storedNet,
+      deductions: 0,
+      storedNet: baseSalary + bonus,
       year,
       month: monthName,
       absentDays: absentC,
       holidayDates: holidayDateSet,
     });
-    const netSalary = recalcNet;
+    // If stored deductions already include absence (from PaySalaryDialog), don't double-count.
+    const manualDeductions = Math.max(0, storedDeductions - absenceDeduction);
+    const netSalary = Math.max(0, baseSalary + bonus + overtimePay - manualDeductions - absenceDeduction);
     const paidAmount =
       pay && (pay.status === 'paid' || pay.status === 'processed')
         ? Math.max(0, netSalary - Number(pay.remaining_amount || 0))
