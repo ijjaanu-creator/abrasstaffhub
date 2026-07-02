@@ -248,3 +248,6 @@
 .delay-300 { animation-delay: 300ms; }
 .delay-400 { animation-delay: 400ms; }
 .delay-500 { animation-delay: 500ms; }
+#lovable-badge {
+  display: none !important;
+}
