@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '@/integrations/supabase/client';
 import abrasLogo from '@/assets/abras-logo.png';
+import { recalcNetSalary } from './payrollCalc';
 
 interface Options {
   selectedMonth: string; // 'YYYY-MM'
@@ -241,16 +242,28 @@ export async function generateStaffReportPDF({ selectedMonth }: Options) {
     // Payroll block
     const pay = payroll.find((p: any) => p.staff_id === staff.id);
     const baseSalary = Number(staff.salary || 0);
-    const netSalary = pay ? Number(pay.net_salary || 0) : baseSalary;
+    const holidayDateSet = new Set<string>(Array.from(holidayMap.keys()) as string[]);
+    const bonus = Number(pay?.bonus || 0);
+    const storedDeductions = Number(pay?.deductions || 0);
+    const storedNet = pay ? Number(pay.net_salary || 0) : baseSalary + bonus - storedDeductions;
+    const { net: recalcNet, absenceDeduction, workingDays } = recalcNetSalary({
+      baseSalary,
+      bonus,
+      deductions: storedDeductions,
+      storedNet,
+      year,
+      month: monthName,
+      absentDays: absentC,
+      holidayDates: holidayDateSet,
+    });
+    const netSalary = recalcNet;
     const paidAmount =
       pay && (pay.status === 'paid' || pay.status === 'processed')
-        ? netSalary - Number(pay.remaining_amount || 0)
+        ? Math.max(0, netSalary - Number(pay.remaining_amount || 0))
         : Number(pay?.advance_amount || 0);
-    const remaining = pay
-      ? Number(pay.remaining_amount ?? Math.max(0, netSalary - paidAmount))
-      : netSalary;
+    const remaining = Math.max(0, netSalary - paidAmount);
 
-    ensureSpace(230);
+    ensureSpace(260);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(20);
@@ -261,9 +274,12 @@ export async function generateStaffReportPDF({ selectedMonth }: Options) {
       head: [['Item', 'Amount']],
       body: [
         ['Original Salary', fmtINR(baseSalary)],
-        ['Bonus', fmtINR(Number(pay?.bonus || 0))],
+        [`Working Days in Month`, String(workingDays)],
+        [`Absent Days`, String(absentC)],
+        [`Absence Deduction (${absentC} × Rs. ${workingDays ? Math.round(baseSalary / workingDays).toLocaleString('en-IN') : 0})`, `- ${fmtINR(absenceDeduction)}`],
+        ['Bonus', fmtINR(bonus)],
         ['Overtime Pay', fmtINR(Number(pay?.overtime || 0))],
-        ['Deductions', fmtINR(Number(pay?.deductions || 0))],
+        ['Other Deductions', fmtINR(storedDeductions)],
         ['Net Salary (Payable)', fmtINR(netSalary)],
         ['Advance Paid', fmtINR(Number(pay?.advance_amount || 0))],
         ['Amount Paid', fmtINR(paidAmount)],
@@ -274,8 +290,8 @@ export async function generateStaffReportPDF({ selectedMonth }: Options) {
       styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak' },
       headStyles: { fillColor: [237, 34, 58], textColor: 255 },
       columnStyles: {
-        0: { cellWidth: contentW * 0.55 },
-        1: { cellWidth: contentW * 0.45, halign: 'right' },
+        0: { cellWidth: contentW * 0.6 },
+        1: { cellWidth: contentW * 0.4, halign: 'right' },
       },
       margin: { left: margin, right: margin, bottom: 90 },
     });
