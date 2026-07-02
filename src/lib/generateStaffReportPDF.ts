@@ -102,9 +102,13 @@ export async function generateStaffReportPDF({ selectedMonth }: Options) {
   doc.setFontSize(11);
   doc.setTextColor(80);
   doc.text(`Generated on ${new Date().toLocaleString('en-IN')}`, margin, 152);
-  doc.text(`Total staff included: ${staffList.length}`, margin, 170);
+  // Filter out staff with no attendance records at all this month (treated as inactive for the period)
+  const staffWithAttendance = staffList.filter((s: any) =>
+    attendance.some((a: any) => a.staff_id === s.id),
+  );
+  doc.text(`Total staff included: ${staffWithAttendance.length}`, margin, 170);
 
-  for (const staff of staffList) {
+  for (const staff of staffWithAttendance) {
     doc.addPage();
     drawHeader(`${staff.name || 'Unknown'} — ${monthName} ${year}`);
 
