@@ -281,7 +281,7 @@ export async function generateStaffReportPDF({ selectedMonth }: Options) {
         [`Absence Deduction (${absentC} × Rs. ${workingDays ? Math.round(baseSalary / workingDays).toLocaleString('en-IN') : 0})`, `- ${fmtINR(absenceDeduction)}`],
         ['Bonus', fmtINR(bonus)],
         ['Overtime Pay', fmtINR(Number(pay?.overtime || 0))],
-        ['Other Deductions', fmtINR(storedDeductions)],
+        ['Other Deductions', fmtINR(manualDeductions)],
         ['Net Salary (Payable)', fmtINR(netSalary)],
         ['Advance Paid', fmtINR(Number(pay?.advance_amount || 0))],
         ['Amount Paid', fmtINR(paidAmount)],
