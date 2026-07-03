@@ -126,6 +126,22 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
     enabled: open,
   });
 
+  // Fetch attended (present/late/etc.) records for the month so we know who showed up at least once
+  const { data: monthAttended = [] } = useQuery({
+    queryKey: ['month-attended', startStr, endStr],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .select('staff_id')
+        .gte('date', startStr)
+        .lte('date', endStr)
+        .in('status', ['present', 'late', 'half_day', 'early_leave']);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open,
+  });
+
   // Count non-working days in the month (Sundays + holidays)
   const holidayDates = new Set(monthHolidays.map((h: any) => h.date));
   let nonWorkingDays = 0;
@@ -142,11 +158,18 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
     absencesByStaff.set(a.staff_id, (absencesByStaff.get(a.staff_id) || 0) + 1);
   });
 
+  // Attended day count per staff
+  const attendedByStaff = new Map<string, number>();
+  monthAttended.forEach((a: any) => {
+    attendedByStaff.set(a.staff_id, (attendedByStaff.get(a.staff_id) || 0) + 1);
+  });
+
   const computeAbsenceDeduction = (staffSalary: number, staffId: string) => {
     const absentDays = absencesByStaff.get(staffId) || 0;
     const dailyRate = staffSalary / workingDaysInMonth;
     return Math.round(absentDays * dailyRate);
   };
+
 
   const selectedStaff = staffMembers.find(s => s.id === selectedStaffId);
   const pendingBalance = pendingBalanceRecords.reduce((sum, r) => sum + Number(r.remaining_amount || 0), 0);
