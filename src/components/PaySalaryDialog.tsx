@@ -261,7 +261,7 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
           if (advanceError) throw advanceError;
           remainingToAllocate -= appliedAmount;
         }
-        return sortedRecords.length;
+        return { count: sortedRecords.length, skippedInactive: [] as { id: string; name: string }[] };
       }
 
       const records = staffToProcess.map(staff => {
