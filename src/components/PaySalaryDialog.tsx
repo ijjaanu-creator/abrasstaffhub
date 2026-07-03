@@ -314,23 +314,33 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
         if (advanceError) throw advanceError;
       }
 
-      return records.length;
+      return { count: records.length, skippedInactive };
     },
-    onSuccess: (count) => {
+    onSuccess: (result) => {
+      const count = typeof result === 'number' ? result : result.count;
+      const skippedInactive = typeof result === 'number' ? [] : result.skippedInactive;
       queryClient.invalidateQueries({ queryKey: ['payroll-records'] });
       queryClient.invalidateQueries({ queryKey: ['pending-balance-records'] });
       queryClient.invalidateQueries({ queryKey: ['recentPayroll'] });
-      
-      const message = paymentMode === 'advance' 
-        ? `Advance of ₹${parseFloat(advanceAmount).toLocaleString()} paid. Balance pending.`
-        : paymentMode === 'balance'
-        ? `Balance payment of ₹${(parseFloat(balanceAmount) || pendingBalance).toLocaleString()} completed.`
-        : `Created ${count} payroll record${count > 1 ? 's' : ''}.`;
-      
-      toast({ 
+      queryClient.invalidateQueries({ queryKey: ['active-staff-for-payment'] });
+      queryClient.invalidateQueries({ queryKey: ['staff-members'] });
+
+      let message =
+        paymentMode === 'advance'
+          ? `Advance of ₹${parseFloat(advanceAmount).toLocaleString()} paid. Balance pending.`
+          : paymentMode === 'balance'
+          ? `Balance payment of ₹${(parseFloat(balanceAmount) || pendingBalance).toLocaleString()} completed.`
+          : `Created ${count} payroll record${count > 1 ? 's' : ''}.`;
+
+      if (skippedInactive.length > 0) {
+        message += ` Skipped & deactivated (no attendance): ${skippedInactive.map(s => s.name).join(', ')}.`;
+      }
+
+      toast({
         title: 'Salary payment created!',
-        description: message
+        description: message,
       });
+
       onOpenChange(false);
       resetForm();
     },
