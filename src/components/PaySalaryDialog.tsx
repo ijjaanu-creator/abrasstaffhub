@@ -198,11 +198,14 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
         skippedInactive = noShow.map(s => ({ id: s.id, name: s.name }));
         staffToProcess = staffToProcessRaw.filter(s => (attendedByStaff.get(s.id) || 0) > 0);
 
-        if (noShow.length > 0) {
+        // Only deactivate staff who are currently active (avoid touching already-inactive ones)
+        const toDeactivate = noShow.filter((s: any) => s.status === 'active').map(s => s.id);
+        if (toDeactivate.length > 0) {
           const { error: deactivateError } = await supabase
             .from('staff_members')
             .update({ status: 'inactive' })
-            .in('id', noShow.map(s => s.id));
+            .in('id', toDeactivate);
+
           if (deactivateError) throw deactivateError;
         }
       }
