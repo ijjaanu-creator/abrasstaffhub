@@ -126,6 +126,22 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
     enabled: open,
   });
 
+  // Fetch attended (present/late/etc.) records for the month so we know who showed up at least once
+  const { data: monthAttended = [] } = useQuery({
+    queryKey: ['month-attended', startStr, endStr],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .select('staff_id')
+        .gte('date', startStr)
+        .lte('date', endStr)
+        .in('status', ['present', 'late', 'half_day', 'early_leave']);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open,
+  });
+
   // Count non-working days in the month (Sundays + holidays)
   const holidayDates = new Set(monthHolidays.map((h: any) => h.date));
   let nonWorkingDays = 0;
@@ -142,11 +158,18 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
     absencesByStaff.set(a.staff_id, (absencesByStaff.get(a.staff_id) || 0) + 1);
   });
 
+  // Attended day count per staff
+  const attendedByStaff = new Map<string, number>();
+  monthAttended.forEach((a: any) => {
+    attendedByStaff.set(a.staff_id, (attendedByStaff.get(a.staff_id) || 0) + 1);
+  });
+
   const computeAbsenceDeduction = (staffSalary: number, staffId: string) => {
     const absentDays = absencesByStaff.get(staffId) || 0;
     const dailyRate = staffSalary / workingDaysInMonth;
     return Math.round(absentDays * dailyRate);
   };
+
 
   const selectedStaff = staffMembers.find(s => s.id === selectedStaffId);
   const pendingBalance = pendingBalanceRecords.reduce((sum, r) => sum + Number(r.remaining_amount || 0), 0);
@@ -156,13 +179,31 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
 
   const createPayrollMutation = useMutation({
     mutationFn: async () => {
-      const staffToProcess = paymentType === 'bulk' 
+      const staffToProcessRaw = paymentType === 'bulk' 
         ? staffMembers 
         : staffMembers.filter(s => s.id === selectedStaffId);
 
-      if (staffToProcess.length === 0) {
-        throw new Error('No staff selected');
+      // For bulk pay: skip staff who never showed up this month, and deactivate them.
+      let skippedInactive: { id: string; name: string }[] = [];
+      let staffToProcess = staffToProcessRaw;
+      if (paymentType === 'bulk') {
+        const noShow = staffToProcessRaw.filter(s => (attendedByStaff.get(s.id) || 0) === 0);
+        skippedInactive = noShow.map(s => ({ id: s.id, name: s.name }));
+        staffToProcess = staffToProcessRaw.filter(s => (attendedByStaff.get(s.id) || 0) > 0);
+
+        if (noShow.length > 0) {
+          const { error: deactivateError } = await supabase
+            .from('staff_members')
+            .update({ status: 'inactive' })
+            .in('id', noShow.map(s => s.id));
+          if (deactivateError) throw deactivateError;
+        }
       }
+
+      if (staffToProcess.length === 0) {
+        throw new Error('No staff to pay (all selected staff were absent the entire month)');
+      }
+
 
       const bonusAmount = parseFloat(bonus) || 0;
       const deductionsAmount = parseFloat(deductions) || 0;
@@ -220,7 +261,7 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
           if (advanceError) throw advanceError;
           remainingToAllocate -= appliedAmount;
         }
-        return sortedRecords.length;
+        return { count: sortedRecords.length, skippedInactive: [] as { id: string; name: string }[] };
       }
 
       const records = staffToProcess.map(staff => {
@@ -273,23 +314,33 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
         if (advanceError) throw advanceError;
       }
 
-      return records.length;
+      return { count: records.length, skippedInactive };
     },
-    onSuccess: (count) => {
+    onSuccess: (result) => {
+      const count = typeof result === 'number' ? result : result.count;
+      const skippedInactive = typeof result === 'number' ? [] : result.skippedInactive;
       queryClient.invalidateQueries({ queryKey: ['payroll-records'] });
       queryClient.invalidateQueries({ queryKey: ['pending-balance-records'] });
       queryClient.invalidateQueries({ queryKey: ['recentPayroll'] });
-      
-      const message = paymentMode === 'advance' 
-        ? `Advance of ₹${parseFloat(advanceAmount).toLocaleString()} paid. Balance pending.`
-        : paymentMode === 'balance'
-        ? `Balance payment of ₹${(parseFloat(balanceAmount) || pendingBalance).toLocaleString()} completed.`
-        : `Created ${count} payroll record${count > 1 ? 's' : ''}.`;
-      
-      toast({ 
+      queryClient.invalidateQueries({ queryKey: ['active-staff-for-payment'] });
+      queryClient.invalidateQueries({ queryKey: ['staff-members'] });
+
+      let message =
+        paymentMode === 'advance'
+          ? `Advance of ₹${parseFloat(advanceAmount).toLocaleString()} paid. Balance pending.`
+          : paymentMode === 'balance'
+          ? `Balance payment of ₹${(parseFloat(balanceAmount) || pendingBalance).toLocaleString()} completed.`
+          : `Created ${count} payroll record${count > 1 ? 's' : ''}.`;
+
+      if (skippedInactive.length > 0) {
+        message += ` Skipped & deactivated (no attendance): ${skippedInactive.map(s => s.name).join(', ')}.`;
+      }
+
+      toast({
         title: 'Salary payment created!',
-        description: message
+        description: message,
       });
+
       onOpenChange(false);
       resetForm();
     },
