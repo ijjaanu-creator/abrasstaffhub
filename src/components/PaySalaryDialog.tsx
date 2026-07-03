@@ -179,13 +179,31 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
 
   const createPayrollMutation = useMutation({
     mutationFn: async () => {
-      const staffToProcess = paymentType === 'bulk' 
+      const staffToProcessRaw = paymentType === 'bulk' 
         ? staffMembers 
         : staffMembers.filter(s => s.id === selectedStaffId);
 
-      if (staffToProcess.length === 0) {
-        throw new Error('No staff selected');
+      // For bulk pay: skip staff who never showed up this month, and deactivate them.
+      let skippedInactive: { id: string; name: string }[] = [];
+      let staffToProcess = staffToProcessRaw;
+      if (paymentType === 'bulk') {
+        const noShow = staffToProcessRaw.filter(s => (attendedByStaff.get(s.id) || 0) === 0);
+        skippedInactive = noShow.map(s => ({ id: s.id, name: s.name }));
+        staffToProcess = staffToProcessRaw.filter(s => (attendedByStaff.get(s.id) || 0) > 0);
+
+        if (noShow.length > 0) {
+          const { error: deactivateError } = await supabase
+            .from('staff_members')
+            .update({ status: 'inactive' })
+            .in('id', noShow.map(s => s.id));
+          if (deactivateError) throw deactivateError;
+        }
       }
+
+      if (staffToProcess.length === 0) {
+        throw new Error('No staff to pay (all selected staff were absent the entire month)');
+      }
+
 
       const bonusAmount = parseFloat(bonus) || 0;
       const deductionsAmount = parseFloat(deductions) || 0;
