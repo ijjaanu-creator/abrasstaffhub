@@ -332,7 +332,7 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
       queryClient.invalidateQueries({ queryKey: ['payroll-records'] });
       queryClient.invalidateQueries({ queryKey: ['pending-balance-records'] });
       queryClient.invalidateQueries({ queryKey: ['recentPayroll'] });
-      queryClient.invalidateQueries({ queryKey: ['active-staff-for-payment'] });
+      queryClient.invalidateQueries({ queryKey: ['staff-for-payment'] });
       queryClient.invalidateQueries({ queryKey: ['staff-members'] });
 
       let message =
