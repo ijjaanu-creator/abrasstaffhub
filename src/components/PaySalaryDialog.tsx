@@ -54,20 +54,27 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
   const [balanceAmount, setBalanceAmount] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Fetch active staff members
+  // Compute date range for selected month/year (needed for staff eligibility filter)
+  const _monthIndex = months.indexOf(month);
+  const _yearNum = parseInt(year) || currentDate.getFullYear();
+  const _endStr = format(new Date(_yearNum, _monthIndex + 1, 0), 'yyyy-MM-dd');
+
+  // Fetch staff eligible for the selected month: joined on/before the end of that month.
+  // Include inactive staff too — they may have worked part of that month before being deactivated.
   const { data: staffMembers = [], isLoading: staffLoading } = useQuery({
-    queryKey: ['active-staff-for-payment'],
+    queryKey: ['staff-for-payment', _endStr],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('staff_members')
-        .select('id, name, employee_id, position, salary')
-        .eq('status', 'active')
+        .select('id, name, employee_id, position, salary, join_date, status')
+        .lte('join_date', _endStr)
         .order('name');
       if (error) throw error;
       return data;
     },
     enabled: open,
   });
+
 
   // Fetch pending balance records for the selected staff (always fetch when staff selected)
   const { data: pendingBalanceRecords = [] } = useQuery({
@@ -191,11 +198,14 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
         skippedInactive = noShow.map(s => ({ id: s.id, name: s.name }));
         staffToProcess = staffToProcessRaw.filter(s => (attendedByStaff.get(s.id) || 0) > 0);
 
-        if (noShow.length > 0) {
+        // Only deactivate staff who are currently active (avoid touching already-inactive ones)
+        const toDeactivate = noShow.filter((s: any) => s.status === 'active').map(s => s.id);
+        if (toDeactivate.length > 0) {
           const { error: deactivateError } = await supabase
             .from('staff_members')
             .update({ status: 'inactive' })
-            .in('id', noShow.map(s => s.id));
+            .in('id', toDeactivate);
+
           if (deactivateError) throw deactivateError;
         }
       }
@@ -322,7 +332,7 @@ export function PaySalaryDialog({ open, onOpenChange }: PaySalaryDialogProps) {
       queryClient.invalidateQueries({ queryKey: ['payroll-records'] });
       queryClient.invalidateQueries({ queryKey: ['pending-balance-records'] });
       queryClient.invalidateQueries({ queryKey: ['recentPayroll'] });
-      queryClient.invalidateQueries({ queryKey: ['active-staff-for-payment'] });
+      queryClient.invalidateQueries({ queryKey: ['staff-for-payment'] });
       queryClient.invalidateQueries({ queryKey: ['staff-members'] });
 
       let message =
