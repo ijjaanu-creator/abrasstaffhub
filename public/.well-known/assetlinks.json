@@ -1,0 +1,15 @@
+[{
+
+  "relation": ["delegate_permission/common.handle_all_urls"],
+
+  "target": {
+
+    "namespace": "android_app",
+
+    "package_name": "app.lovable.abrasstaffhub.twa",
+
+    "sha256_cert_fingerprints": ["4B:55:88:89:82:17:DC:27:4F:38:A2:12:A3:32:91:CD:0E:61:05:02:35:29:D0:88:48:AE:41:67:BF:1D:6D:8B"]
+
+  }
+
+}]
